@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"io"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -149,12 +150,23 @@ type MeshNode struct {
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
 }
 
-func (nd *MeshNode) GetBoundbox() *Extent3 {
-	ext := NewExtent3()
+func (nd *MeshNode) GetBoundbox() *[6]float64 {
+	minX := math.MaxFloat64
+	minY := math.MaxFloat64
+	minZ := math.MaxFloat64
+	maxX := -math.MaxFloat64
+	maxY := -math.MaxFloat64
+	maxZ := -math.MaxFloat64
 	for i := range nd.Vertices {
-		ext.AddPoints([]float64{float64(nd.Vertices[i][0]), float64(nd.Vertices[i][1]), float64(nd.Vertices[i][2])})
+		minX = math.Min(minX, float64(nd.Vertices[i][0]))
+		minY = math.Min(minY, float64(nd.Vertices[i][1]))
+		minZ = math.Min(minZ, float64(nd.Vertices[i][2]))
+
+		maxX = math.Min(maxX, float64(nd.Vertices[i][0]))
+		maxY = math.Min(maxY, float64(nd.Vertices[i][1]))
+		maxZ = math.Min(maxZ, float64(nd.Vertices[i][2]))
 	}
-	return ext
+	return [6]float64{minX, minY, minZ, maxX, maxY, maxZ}
 }
 
 type Mesh struct {
