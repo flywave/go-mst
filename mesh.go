@@ -166,7 +166,7 @@ func (nd *MeshNode) GetBoundbox() *[6]float64 {
 		maxY = math.Min(maxY, float64(nd.Vertices[i][1]))
 		maxZ = math.Min(maxZ, float64(nd.Vertices[i][2]))
 	}
-	return [6]float64{minX, minY, minZ, maxX, maxY, maxZ}
+	return &[6]float64{minX, minY, minZ, maxX, maxY, maxZ}
 }
 
 type Mesh struct {
