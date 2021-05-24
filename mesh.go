@@ -162,9 +162,9 @@ func (nd *MeshNode) GetBoundbox() *[6]float64 {
 		minY = math.Min(minY, float64(nd.Vertices[i][1]))
 		minZ = math.Min(minZ, float64(nd.Vertices[i][2]))
 
-		maxX = math.Min(maxX, float64(nd.Vertices[i][0]))
-		maxY = math.Min(maxY, float64(nd.Vertices[i][1]))
-		maxZ = math.Min(maxZ, float64(nd.Vertices[i][2]))
+		maxX = math.Max(maxX, float64(nd.Vertices[i][0]))
+		maxY = math.Max(maxY, float64(nd.Vertices[i][1]))
+		maxZ = math.Max(maxZ, float64(nd.Vertices[i][2]))
 	}
 	return &[6]float64{minX, minY, minZ, maxX, maxY, maxZ}
 }
