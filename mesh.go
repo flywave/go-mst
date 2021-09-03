@@ -150,6 +150,12 @@ type MeshNode struct {
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
 }
 
+type InstanceMst struct {
+	Transfors []*dmat.T
+	Mst       *Mesh
+	BBox      *[6]float64
+}
+
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
 	minX := math.MaxFloat64
 	minY := math.MaxFloat64
