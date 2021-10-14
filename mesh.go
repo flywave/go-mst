@@ -151,9 +151,9 @@ type MeshNode struct {
 }
 
 type InstanceMst struct {
-	Transfors []*dmat.T
-	Mst       *Mesh
-	BBox      *[6]float64
+	Transfors  []*dmat.T
+	MeshNodeId uint32
+	BBox       *[6]float64
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -176,9 +176,10 @@ func (nd *MeshNode) GetBoundbox() *[6]float64 {
 }
 
 type Mesh struct {
-	Version   uint32         `json:"version"`
-	Materials []MeshMaterial `json:"materials,omitempty"`
-	Nodes     []*MeshNode    `json:"nodes,omitempty"`
+	Version      uint32         `json:"version"`
+	Materials    []MeshMaterial `json:"materials,omitempty"`
+	Nodes        []*MeshNode    `json:"nodes,omitempty"`
+	InstanceNode []*InstanceMst
 }
 
 func NewMesh() *Mesh {
@@ -576,6 +577,7 @@ func MeshMarshal(wt io.Writer, ms *Mesh) {
 	writeLittleByte(wt, ms.Version)
 	MtlsMarshal(wt, ms.Materials)
 	MeshNodesMarshal(wt, ms.Nodes)
+	MeshInstanceNodesMarshal(wt, ms.InstanceNode)
 }
 
 func MeshUnMarshal(rd io.Reader) *Mesh {
@@ -585,7 +587,57 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	readLittleByte(rd, &ms.Version)
 	ms.Materials = MtlsUnMarshal(rd)
 	ms.Nodes = MeshNodesUnMarshal(rd)
+	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd)
 	return &ms
+}
+
+func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMst) {
+	writeLittleByte(wt, uint32(len(instNd)))
+	for _, nd := range instNd {
+		MeshInstanceNodeMarshal(wt, nd)
+	}
+}
+
+func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
+	writeLittleByte(wt, len(instNd.Transfors))
+	for _, mt := range instNd.Transfors {
+		writeLittleByte(wt, mt[0][:])
+		writeLittleByte(wt, mt[1][:])
+		writeLittleByte(wt, mt[2][:])
+		writeLittleByte(wt, mt[3][:])
+	}
+	writeLittleByte(wt, instNd.MeshNodeId)
+	writeLittleByte(wt, instNd.BBox)
+}
+
+func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMst {
+	var size uint32
+	readLittleByte(rd, &size)
+	nds := make([]*InstanceMst, size, size)
+	for i := range nds {
+		nds[i] = MeshInstanceNodeUnMarshal(rd)
+	}
+	return nds
+}
+
+func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
+	inst := &InstanceMst{}
+	var size uint32
+	readLittleByte(rd, &size)
+	mats := make([]*dmat.T, size, size)
+	for i := range mats {
+		mt := &dmat.T{}
+		readLittleByte(rd, mt[0][:])
+		readLittleByte(rd, mt[1][:])
+		readLittleByte(rd, mt[2][:])
+		readLittleByte(rd, mt[3][:])
+		mats[i] = mt
+	}
+	readLittleByte(rd, &size)
+	inst.MeshNodeId = size
+	inst.BBox = &[6]float64{}
+	readLittleByte(rd, inst.BBox)
+	return inst
 }
 
 func MeshReadFrom(path string) (*Mesh, error) {
