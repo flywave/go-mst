@@ -86,6 +86,7 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 	mtlMap := make(map[uint32]uint32)
 	var prewCreateMtlCount uint32 = 0
+	meshCount := len(doc.Meshes)
 	for _, nd := range mh.Nodes {
 		var bt []byte
 		bvSize := len(doc.BufferViews)
@@ -242,6 +243,16 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			doc.Accessors = append(doc.Accessors, *nlacc)
 		}
 		doc.Meshes = append(doc.Meshes, *mesh)
+	}
+	for _, inst := range mh.InstanceNode {
+		meshId := inst.MeshNodeId + uint32(meshCount)
+		for _, mt := range inst.Transfors {
+			nd := gltf.Node{
+				Mesh:   &meshId,
+				Matrix: *mt.Array(),
+			}
+			doc.Nodes = append(doc.Nodes, nd)
+		}
 	}
 	e := fillMaterials(doc, mh)
 	if e != nil {
