@@ -27,7 +27,7 @@ func CreateDoc() *gltf.Document {
 	doc.Asset.Version = GLTF_VERSION
 	srcIndex := uint32(0)
 	doc.Scene = &srcIndex
-	doc.Scenes = append(doc.Scenes, gltf.Scene{})
+	doc.Scenes = append(doc.Scenes, &gltf.Scene{})
 	return doc
 }
 
@@ -98,13 +98,13 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		}
 		indecs.ByteLength = uint32(buf.Len()) - indecs.ByteOffset
 		indecs.Buffer = uint32(len(doc.Buffers))
-		doc.BufferViews = append(doc.BufferViews, *indecs)
+		doc.BufferViews = append(doc.BufferViews, indecs)
 
 		buffer := &gltf.Buffer{}
 		buffer.ByteLength = uint32(buf.Len())
 		buffer.Data = buf.Bytes()
 		buffer.EmbeddedResource()
-		doc.Buffers = append(doc.Buffers, *buffer)
+		doc.Buffers = append(doc.Buffers, buffer)
 
 		buf2 := bytes.NewBuffer(bt)
 		postions := &gltf.BufferView{}
@@ -113,13 +113,13 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		postions.ByteLength = uint32(buf2.Len()) - postions.ByteOffset
 		postions.Buffer = uint32(len(doc.Buffers))
 		bvPos := uint32(len(doc.BufferViews))
-		doc.BufferViews = append(doc.BufferViews, *postions)
+		doc.BufferViews = append(doc.BufferViews, postions)
 
 		buffer2 := &gltf.Buffer{}
 		buffer2.ByteLength = uint32(buf2.Len())
 		buffer2.Data = buf2.Bytes()
 		buffer2.EmbeddedResource()
-		doc.Buffers = append(doc.Buffers, *buffer2)
+		doc.Buffers = append(doc.Buffers, buffer2)
 
 		texcood := &gltf.BufferView{}
 		bvTexc := uint32(len(doc.BufferViews))
@@ -129,13 +129,13 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			binary.Write(buf3, binary.LittleEndian, nd.TexCoords)
 			texcood.ByteLength = uint32(buf3.Len()) - texcood.ByteOffset
 			texcood.Buffer = uint32(len(doc.Buffers))
-			doc.BufferViews = append(doc.BufferViews, *texcood)
+			doc.BufferViews = append(doc.BufferViews, texcood)
 
 			buffer3 := &gltf.Buffer{}
 			buffer3.ByteLength = uint32(buf3.Len())
 			buffer3.Data = buf3.Bytes()
 			buffer3.EmbeddedResource()
-			doc.Buffers = append(doc.Buffers, *buffer3)
+			doc.Buffers = append(doc.Buffers, buffer3)
 		}
 
 		normalView := &gltf.BufferView{}
@@ -146,14 +146,14 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			binary.Write(buf4, binary.LittleEndian, nd.Normals)
 			normalView.ByteLength = uint32(buf4.Len()) - normalView.ByteOffset
 			normalView.Buffer = uint32(len(doc.Buffers))
-			doc.BufferViews = append(doc.BufferViews, *normalView)
+			doc.BufferViews = append(doc.BufferViews, normalView)
 
 			buffer4 := &gltf.Buffer{}
 			buffer4.ByteLength = uint32(buf4.Len())
 			buffer4.Data = buf4.Bytes()
 			buffer4.EmbeddedResource()
 
-			doc.Buffers = append(doc.Buffers, *buffer4)
+			doc.Buffers = append(doc.Buffers, buffer4)
 		}
 
 		mesh := &gltf.Mesh{}
@@ -161,7 +161,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		nde := &gltf.Node{}
 		l := (uint32)(len(doc.Meshes))
 		nde.Mesh = &l
-		doc.Nodes = append(doc.Nodes, *nde)
+		doc.Nodes = append(doc.Nodes, nde)
 
 		aftIndices := uint32(len(nd.FaceGroup))
 		idx := uint32(len(doc.Accessors))
@@ -195,63 +195,69 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			if len(nd.Normals) > 0 {
 				ps.Attributes["NORMAL"] = indexNl
 			}
-			ps.Mode = gltf.Triangles
+			ps.Mode = gltf.PrimitiveTriangles
 			mtlId := uint32(patch.Batchid) + uint32(len(doc.Materials))
 			ps.Material = &mtlId
-			mesh.Primitives = append(mesh.Primitives, *ps)
+			mesh.Primitives = append(mesh.Primitives, ps)
 
 			indexacc := &gltf.Accessor{}
-			indexacc.ComponentType = gltf.UnsignedInt
+			indexacc.ComponentType = gltf.ComponentUint
 
 			indexacc.ByteOffset = start * 12
 			indexacc.Count = uint32(len(patch.Faces)) * 3
 			start += uint32(len(patch.Faces))
 			bfindex := uint32(bvSize)
 			indexacc.BufferView = &bfindex
-			doc.Accessors = append(doc.Accessors, *indexacc)
+			doc.Accessors = append(doc.Accessors, indexacc)
 		}
 
 		posacc := &gltf.Accessor{}
-		posacc.ComponentType = gltf.Float
-		posacc.Type = gltf.Vec3
+		posacc.ComponentType = gltf.ComponentFloat
+		posacc.Type = gltf.AccessorMat3
 		posacc.Count = uint32(len(nd.Vertices))
 		posacc.ByteOffset = postions.ByteOffset
 
 		posacc.BufferView = &bvPos
 		box := nd.GetBoundbox()
-		posacc.Min = []float64{box[0], box[1], box[2]}
-		posacc.Max = []float64{box[3], box[4], box[5]}
-		doc.Accessors = append(doc.Accessors, *posacc)
+		posacc.Min = []float32{float32(box[0]), float32(box[1]), float32(box[2])}
+		posacc.Max = []float32{float32(box[3]), float32(box[4]), float32(box[5])}
+		doc.Accessors = append(doc.Accessors, posacc)
 
 		if len(nd.TexCoords) > 0 {
 			texacc := &gltf.Accessor{}
-			texacc.ComponentType = gltf.Float
-			texacc.Type = gltf.Vec2
+			texacc.ComponentType = gltf.ComponentFloat
+			texacc.Type = gltf.AccessorVec2
 			texacc.Count = uint32(len(nd.TexCoords))
 			texacc.ByteOffset = texcood.ByteOffset
 			texacc.BufferView = &bvTexc
-			doc.Accessors = append(doc.Accessors, *texacc)
+			doc.Accessors = append(doc.Accessors, texacc)
 		}
 
 		if len(nd.Normals) > 0 {
 			nlacc := &gltf.Accessor{}
-			nlacc.ComponentType = gltf.Float
-			nlacc.Type = gltf.Vec3
+			nlacc.ComponentType = gltf.ComponentFloat
+			nlacc.Type = gltf.AccessorVec3
 			nlacc.Count = uint32(len(nd.Normals))
 			nlacc.ByteOffset = normalView.ByteOffset
 			nlacc.BufferView = &bvNl
-			doc.Accessors = append(doc.Accessors, *nlacc)
+			doc.Accessors = append(doc.Accessors, nlacc)
 		}
-		doc.Meshes = append(doc.Meshes, *mesh)
+		doc.Meshes = append(doc.Meshes, mesh)
 	}
 	for _, inst := range mh.InstanceNode {
 		meshId := inst.MeshNodeId + uint32(meshCount)
 		for _, mt := range inst.Transfors {
+			ay := *mt.Array()
 			nd := gltf.Node{
-				Mesh:   &meshId,
-				Matrix: *mt.Array(),
+				Mesh: &meshId,
+				Matrix: [16]float32{
+					float32(ay[0]), float32(ay[1]), float32(ay[2]), float32(ay[3]),
+					float32(ay[4]), float32(ay[5]), float32(ay[6]), float32(ay[7]),
+					float32(ay[8]), float32(ay[9]), float32(ay[10]), float32(ay[11]),
+					float32(ay[12]), float32(ay[13]), float32(ay[14]), float32(ay[15]),
+				},
 			}
-			doc.Nodes = append(doc.Nodes, nd)
+			doc.Nodes = append(doc.Nodes, &nd)
 		}
 	}
 	e := fillMaterials(doc, mh)
@@ -266,31 +272,31 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 	for i := range mesh.Materials {
 		mtl := mesh.Materials[i]
 
-		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.Mask}
+		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.AlphaMask}
 		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{}
-		cl := &gltf.RGBA{R: 1, G: 1, B: 1, A: 1}
+		cl := &[4]float32{1, 1, 1, 1}
 		var texMtl *TextureMaterial
 		switch ml := mtl.(type) {
 		case *BaseMaterial:
-			cl = &gltf.RGBA{R: float64(ml.Color[0] / 255), G: float64(ml.Color[1] / 255), B: float64(ml.Color[2] / 255), A: 1 - float64(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
 		case *PbrMaterial:
-			cl = &gltf.RGBA{R: float64(ml.Color[0] / 255), G: float64(ml.Color[1] / 255), B: float64(ml.Color[2] / 255), A: 1 - float64(ml.Transparency)}
-			mc := float64(ml.Metallic)
+			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
+			mc := float32(ml.Metallic)
 			gm.PBRMetallicRoughness.MetallicFactor = &mc
-			rs := float64(ml.Roughness)
+			rs := float32(ml.Roughness)
 			gm.PBRMetallicRoughness.RoughnessFactor = &rs
-			gm.EmissiveFactor[0] = float64(ml.Emissive[0])
-			gm.EmissiveFactor[1] = float64(ml.Emissive[1])
-			gm.EmissiveFactor[2] = float64(ml.Emissive[2])
+			gm.EmissiveFactor[0] = float32(ml.Emissive[0])
+			gm.EmissiveFactor[1] = float32(ml.Emissive[1])
+			gm.EmissiveFactor[2] = float32(ml.Emissive[2])
 			texMtl = &ml.TextureMaterial
 		case *LambertMaterial:
-			cl = &gltf.RGBA{R: float64(ml.Color[0] / 255), G: float64(ml.Color[1] / 255), B: float64(ml.Color[2] / 255), A: 1 - float64(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
 		case *PhongMaterial:
-			cl = &gltf.RGBA{R: float64(ml.Color[0] / 255), G: float64(ml.Color[1] / 255), B: float64(ml.Color[2] / 255), A: 1 - float64(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
 		case *TextureMaterial:
-			cl = &gltf.RGBA{R: float64(ml.Color[0] / 255), G: float64(ml.Color[1] / 255), B: float64(ml.Color[2] / 255), A: 1 - float64(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
 			texMtl = ml
 		}
 
@@ -328,27 +334,27 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 			buffer.Data = buf.Bytes()
 			buffer.EmbeddedResource()
 
-			doc.BufferViews = append(doc.BufferViews, *imgBuffView)
-			doc.Buffers = append(doc.Buffers, *buffer)
+			doc.BufferViews = append(doc.BufferViews, imgBuffView)
+			doc.Buffers = append(doc.Buffers, buffer)
 
-			doc.Images = append(doc.Images, *gimg)
+			doc.Images = append(doc.Images, gimg)
 
 			var sp *gltf.Sampler
 			// if texMtl.Texture.Repeated {
-			sp = &gltf.Sampler{WrapS: gltf.Repeat, WrapT: gltf.Repeat}
+			sp = &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
 			// } else {
 			// 	sp = &gltf.Sampler{WrapS: gltf.ClampToEdge, WrapT: gltf.ClampToEdge}
 			// }
-			doc.Samplers = append(doc.Samplers, *sp)
+			doc.Samplers = append(doc.Samplers, sp)
 
 			texIndex := uint32(len(doc.Textures))
 			gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: texIndex}
-			doc.Textures = append(doc.Textures, *tx)
+			doc.Textures = append(doc.Textures, tx)
 		} else {
 			gm.PBRMetallicRoughness.BaseColorFactor = cl
 		}
 
-		doc.Materials = append(doc.Materials, *gm)
+		doc.Materials = append(doc.Materials, gm)
 	}
 	return nil
 }
