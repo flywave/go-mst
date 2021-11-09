@@ -130,9 +130,14 @@ type PhongMaterial struct {
 	Specularity float32 `json:"specularity"`
 }
 
+type Face struct {
+	Vertex [3]uint32
+	Normal *[3]uint32
+	Uv     *[3]uint32
+}
 type MeshTriangle struct {
-	Batchid int32       `json:"batchid"`
-	Faces   [][3]uint32 `json:"faces"`
+	Batchid int32  `json:"batchid"`
+	Faces   []Face `json:"faces"`
 }
 
 type MeshOutline struct {
@@ -245,7 +250,7 @@ func TextureUnMarshal(rd io.Reader) *Texture {
 	readLittleByte(rd, &tex.Id)
 	var name_size uint32
 	readLittleByte(rd, &name_size)
-	nm := make([]byte, name_size, name_size)
+	nm := make([]byte, name_size)
 	rd.Read(nm)
 	tex.Name = string(nm)
 	readLittleByte(rd, &tex.Size)
@@ -254,7 +259,7 @@ func TextureUnMarshal(rd io.Reader) *Texture {
 	readLittleByte(rd, &tex.Compressed)
 	var tex_size uint32
 	readLittleByte(rd, &tex_size)
-	tex.Data = make([]byte, tex_size, tex_size)
+	tex.Data = make([]byte, tex_size)
 	readLittleByte(rd, tex.Data)
 	readLittleByte(rd, &tex.Repeated)
 	return tex
@@ -370,25 +375,18 @@ func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
 	case *BaseMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_COLOR))
 		BaseMaterialMarshal(wt, mtl)
-		break
 	case *TextureMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_TEXTURE))
 		TextureMaterialMarshal(wt, mtl)
-		break
 	case *PbrMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PBR))
 		PbrMaterialMarshal(wt, mtl)
-		break
 	case *LambertMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT))
 		LambertMaterialMarshal(wt, mtl)
-		break
 	case *PhongMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PHONG))
 		PhongMaterialMarshal(wt, mtl)
-		break
-	default:
-		break
 	}
 }
 
@@ -421,7 +419,7 @@ func MtlsMarshal(wt io.Writer, mtls []MeshMaterial) {
 func MtlsUnMarshal(rd io.Reader) []MeshMaterial {
 	var size uint32
 	readLittleByte(rd, &size)
-	mtls := make([]MeshMaterial, size, size)
+	mtls := make([]MeshMaterial, size)
 	for i := 0; i < int(size); i++ {
 		mtls[i] = MaterialUnMarshal(rd)
 	}
@@ -441,7 +439,7 @@ func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
 	readLittleByte(rd, &nd.Batchid)
 	var size uint32
 	readLittleByte(rd, &size)
-	nd.Faces = make([][3]uint32, size, size)
+	nd.Faces = make([]Face, size)
 	for i := 0; i < int(size); i++ {
 		readLittleByte(rd, &nd.Faces[i])
 	}
@@ -461,7 +459,7 @@ func MeshOutlineUnMarshal(rd io.Reader) *MeshOutline {
 	readLittleByte(rd, &nd.Batchid)
 	var size uint32
 	readLittleByte(rd, &size)
-	nd.Edges = make([][2]uint32, size, size)
+	nd.Edges = make([][2]uint32, size)
 	for i := 0; i < int(size); i++ {
 		readLittleByte(rd, &nd.Edges[i])
 	}
@@ -565,7 +563,7 @@ func MeshNodesMarshal(wt io.Writer, nds []*MeshNode) {
 func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 	var size uint32
 	readLittleByte(rd, &size)
-	nds := make([]*MeshNode, size, size)
+	nds := make([]*MeshNode, size)
 	for i := range nds {
 		nds[i] = MeshNodeUnMarshal(rd)
 	}
@@ -582,7 +580,7 @@ func MeshMarshal(wt io.Writer, ms *Mesh) {
 
 func MeshUnMarshal(rd io.Reader) *Mesh {
 	ms := Mesh{}
-	sig := make([]byte, 4, 4)
+	sig := make([]byte, 4)
 	rd.Read(sig)
 	readLittleByte(rd, &ms.Version)
 	ms.Materials = MtlsUnMarshal(rd)
@@ -613,7 +611,7 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
 func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMst {
 	var size uint32
 	readLittleByte(rd, &size)
-	nds := make([]*InstanceMst, size, size)
+	nds := make([]*InstanceMst, size)
 	for i := range nds {
 		nds[i] = MeshInstanceNodeUnMarshal(rd)
 	}
@@ -624,7 +622,7 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
 	inst := &InstanceMst{}
 	var size uint32
 	readLittleByte(rd, &size)
-	mats := make([]*dmat.T, size, size)
+	mats := make([]*dmat.T, size)
 	for i := range mats {
 		mt := &dmat.T{}
 		readLittleByte(rd, mt[0][:])

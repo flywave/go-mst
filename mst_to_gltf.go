@@ -213,7 +213,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 
 		posacc := &gltf.Accessor{}
 		posacc.ComponentType = gltf.ComponentFloat
-		posacc.Type = gltf.AccessorMat3
+		posacc.Type = gltf.AccessorVec3
 		posacc.Count = uint32(len(nd.Vertices))
 		posacc.ByteOffset = postions.ByteOffset
 
