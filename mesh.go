@@ -137,7 +137,7 @@ type Face struct {
 }
 type MeshTriangle struct {
 	Batchid int32  `json:"batchid"`
-	Faces   []Face `json:"faces"`
+	Faces   []*Face `json:"faces"`
 }
 
 type MeshOutline struct {
@@ -430,7 +430,19 @@ func MeshTriangleMarshal(wt io.Writer, nd *MeshTriangle) {
 	writeLittleByte(wt, nd.Batchid)
 	writeLittleByte(wt, uint32(len(nd.Faces)))
 	for _, f := range nd.Faces {
-		writeLittleByte(wt, &f)
+		writeLittleByte(wt, &f.Vertex)
+		if f.Normal!=nil{
+			writeLittleByte(wt, uint32(1))
+			writeLittleByte(wt, f.Normal)
+		}else{
+			writeLittleByte(wt, uint32(0))
+		}
+		if f.Uv!=nil{
+			writeLittleByte(wt, uint32(1))
+			writeLittleByte(wt, f.Uv)
+		}else{
+			writeLittleByte(wt,  uint32(0))
+		}
 	}
 }
 
@@ -439,9 +451,19 @@ func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
 	readLittleByte(rd, &nd.Batchid)
 	var size uint32
 	readLittleByte(rd, &size)
-	nd.Faces = make([]Face, size)
+	nd.Faces = make([]*Face, size)
 	for i := 0; i < int(size); i++ {
-		readLittleByte(rd, &nd.Faces[i])
+		f:=&Face{}
+		readLittleByte(rd, &f.Vertex)
+		var sz uint32
+		readLittleByte(rd, &sz)
+		if sz==1{
+			readLittleByte(rd, f.Nornmal)
+		}
+		readLittleByte(rd, &sz)
+		if sz==1{
+			readLittleByte(rd, f.Uv)
+		}
 	}
 	return &nd
 }

@@ -93,7 +93,7 @@ func ThreejsBin2Mst(fpath string) error {
 		mtls := binobj.FlatTriangle.Material
 		for i, id := range mtls {
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: binobj.FlatTriangle.Vertices[i],
 			}
 			g.Faces = append(g.Faces, f)
@@ -103,7 +103,7 @@ func ThreejsBin2Mst(fpath string) error {
 		mtls := binobj.FlatUVTriangle.Material
 		for i, id := range mtls {
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: binobj.FlatUVTriangle.Vertices[i],
 				Uv:     &binobj.FlatUVTriangle.Uvs[i],
 			}
@@ -115,7 +115,7 @@ func ThreejsBin2Mst(fpath string) error {
 		mtls := binobj.SmoothTriangle.Material
 		for i, id := range mtls {
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: binobj.SmoothTriangle.Vertices[i],
 				Normal: &binobj.SmoothTriangle.Normals[i],
 			}
@@ -127,7 +127,7 @@ func ThreejsBin2Mst(fpath string) error {
 		mtls := binobj.SmoothUVTriangle.Material
 		for i, id := range mtls {
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: binobj.SmoothUVTriangle.Vertices[i],
 				Uv:     &binobj.SmoothUVTriangle.Uvs[i],
 				Normal: &binobj.SmoothUVTriangle.Normals[i],
@@ -142,11 +142,11 @@ func ThreejsBin2Mst(fpath string) error {
 			vt := binobj.FlatQuad.Vertices[i]
 
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: [3]uint32{vt[0], vt[1], vt[2]},
 			}
 			g.Faces = append(g.Faces, f)
-			f = Face{
+			f = &Face{
 				Vertex: [3]uint32{vt[2], vt[3], vt[0]},
 			}
 			g.Faces = append(g.Faces, f)
@@ -160,12 +160,12 @@ func ThreejsBin2Mst(fpath string) error {
 			uv := binobj.FlatUVQuad.Uvs[i]
 
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: [3]uint32{vt[0], vt[1], vt[2]},
 				Uv:     &[3]uint32{uv[0], uv[1], uv[2]},
 			}
 			g.Faces = append(g.Faces, f)
-			f = Face{
+			f = &Face{
 				Vertex: [3]uint32{vt[2], vt[3], vt[0]},
 				Uv:     &[3]uint32{uv[2], uv[3], uv[0]},
 			}
@@ -180,12 +180,12 @@ func ThreejsBin2Mst(fpath string) error {
 			nl := binobj.SmoothQuad.Normals[i]
 
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: [3]uint32{vt[0], vt[1], vt[2]},
 				Normal: &[3]uint32{nl[0], nl[1], nl[2]},
 			}
 			g.Faces = append(g.Faces, f)
-			f = Face{
+			f = &Face{
 				Vertex: [3]uint32{vt[2], vt[3], vt[0]},
 				Normal: &[3]uint32{nl[2], nl[3], nl[0]},
 			}
@@ -201,13 +201,13 @@ func ThreejsBin2Mst(fpath string) error {
 			uv := binobj.SmoothUVQuad.Uvs[i]
 
 			g := nd.FaceGroup[int(id)]
-			f := Face{
+			f := &Face{
 				Vertex: [3]uint32{vt[0], vt[1], vt[2]},
 				Normal: &[3]uint32{nl[0], nl[1], nl[2]},
 				Uv:     &[3]uint32{uv[0], uv[1], uv[2]},
 			}
 			g.Faces = append(g.Faces, f)
-			f = Face{
+			f = &Face{
 				Vertex: [3]uint32{vt[2], vt[3], vt[0]},
 				Normal: &[3]uint32{nl[2], nl[3], nl[0]},
 				Uv:     &[3]uint32{uv[2], uv[3], uv[0]},
