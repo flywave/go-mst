@@ -88,13 +88,16 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 	var prewCreateMtlCount uint32 = 0
 	meshCount := len(doc.Meshes)
 	for _, nd := range mh.Nodes {
+		nd.ResortVtVn()
 		var bt []byte
 		bvSize := len(doc.BufferViews)
 		buf := bytes.NewBuffer(bt)
 		indecs := &gltf.BufferView{}
 		indecs.ByteOffset = uint32(buf.Len())
 		for _, g := range nd.FaceGroup {
-			binary.Write(buf, binary.LittleEndian, g.Faces)
+			for _, f := range g.Faces {
+				binary.Write(buf, binary.LittleEndian, f.Vertex)
+			}
 		}
 		indecs.ByteLength = uint32(buf.Len()) - indecs.ByteOffset
 		indecs.Buffer = uint32(len(doc.Buffers))

@@ -8,25 +8,37 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
 
 func TestToMst(t *testing.T) {
-	dirs := []string{"model"} //"anchormodel",
+	dirs := []string{"anchormodel"} //"anchormodel",
 	for _, d := range dirs {
 		dr := absPath + d
 		fs, _ := readDir(dr, dr, []string{".json"})
 		for _, f := range fs {
 			fpath := dr + f
+			mstPh := strings.Replace(fpath, ".json", ".mst", 1)
+			glbPh := strings.Replace(mstPh, ".mst", ".glb", 1)
+			if _, err := os.Stat(glbPh); !os.IsNotExist(err) {
+				continue
+			}
 			ThreejsBin2Mst(fpath)
+			f, _ := os.Open(mstPh)
+			mh := MeshUnMarshal(f)
+			doc := CreateDoc()
+			BuildGltf(doc, mh)
+			bt, _ := GetGltfBinary(doc, 8)
+			ioutil.WriteFile(glbPh, bt, os.ModePerm)
 		}
 	}
 }
 
 func TestGltf(t *testing.T) {
-	f, _ := os.Open("tests/JingGai_RL.mst")
+	f, _ := os.Open("./tests/JingGai_RL.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
@@ -35,8 +47,8 @@ func TestGltf(t *testing.T) {
 }
 
 func TestBin(t *testing.T) {
-	ThreejsBin2Mst("./tests/JingGai_RL.json")
-	MstToObj("./tests/JingGai_RL.mst", "JingGai_RL")
+	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/5025tiaoyaqi/5025tiyaqi.json")
+	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/5025tiaoyaqi/5025tiyaqi.mst", "5025tiyaqi")
 
 }
 

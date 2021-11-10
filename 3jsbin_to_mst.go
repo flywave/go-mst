@@ -71,6 +71,9 @@ func ThreejsBin2Mst(fpath string) error {
 	if len(binobj.Normals) > 0 {
 		for i := range binobj.Normals {
 			nl := &vec3.T{float32(binobj.Normals[i][0] / 127), float32(binobj.Normals[i][1] / 127), float32(binobj.Normals[i][2] / 127)}
+			if nl.IsZero() {
+				nl[2] = 1
+			}
 			nd.Normals = append(nd.Normals, *nl)
 		}
 	}
@@ -228,10 +231,9 @@ func ThreejsBin2Mst(fpath string) error {
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)
 			tex, err := convertTex(filepath.Join(dir, mtl.MapDiffuse), id)
-			if err != nil {
-				continue
+			if err == nil {
+				ml.Texture = tex
 			}
-			ml.Texture = tex
 		}
 		mesh.Materials = append(mesh.Materials, ml)
 	}

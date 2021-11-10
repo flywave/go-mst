@@ -136,7 +136,7 @@ type Face struct {
 	Uv     *[3]uint32
 }
 type MeshTriangle struct {
-	Batchid int32  `json:"batchid"`
+	Batchid int32   `json:"batchid"`
 	Faces   []*Face `json:"faces"`
 }
 
@@ -153,6 +153,39 @@ type MeshNode struct {
 	Mat       *dmat.T         `json:"mat,omitempty"`
 	FaceGroup []*MeshTriangle `json:"faceGroup,omitempty"`
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
+}
+
+func (n *MeshNode) ResortVtVn() {
+	if len(n.Normals) != 0 {
+		nl := make([]vec3.T, len(n.Vertices))
+		for _, g := range n.FaceGroup {
+			for _, f := range g.Faces {
+				if f.Normal == nil {
+					break
+				}
+				nl[int(f.Vertex[0])] = n.Normals[int((*f.Normal)[0])]
+				nl[int(f.Vertex[1])] = n.Normals[int((*f.Normal)[1])]
+				nl[int(f.Vertex[2])] = n.Normals[int((*f.Normal)[2])]
+				f.Normal = &f.Vertex
+			}
+		}
+		n.Normals = nl
+	}
+	if len(n.TexCoords) != 0 {
+		vt := make([]vec2.T, len(n.Vertices))
+		for _, g := range n.FaceGroup {
+			for _, f := range g.Faces {
+				if f.Uv == nil {
+					break
+				}
+				vt[int(f.Vertex[0])] = n.TexCoords[int((*f.Uv)[0])]
+				vt[int(f.Vertex[1])] = n.TexCoords[int((*f.Uv)[1])]
+				vt[int(f.Vertex[2])] = n.TexCoords[int((*f.Uv)[2])]
+				f.Uv = &f.Vertex
+			}
+		}
+		n.TexCoords = vt
+	}
 }
 
 type InstanceMst struct {
@@ -431,17 +464,17 @@ func MeshTriangleMarshal(wt io.Writer, nd *MeshTriangle) {
 	writeLittleByte(wt, uint32(len(nd.Faces)))
 	for _, f := range nd.Faces {
 		writeLittleByte(wt, &f.Vertex)
-		if f.Normal!=nil{
+		if f.Normal != nil {
 			writeLittleByte(wt, uint32(1))
 			writeLittleByte(wt, f.Normal)
-		}else{
+		} else {
 			writeLittleByte(wt, uint32(0))
 		}
-		if f.Uv!=nil{
+		if f.Uv != nil {
 			writeLittleByte(wt, uint32(1))
 			writeLittleByte(wt, f.Uv)
-		}else{
-			writeLittleByte(wt,  uint32(0))
+		} else {
+			writeLittleByte(wt, uint32(0))
 		}
 	}
 }
@@ -453,15 +486,18 @@ func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
 	readLittleByte(rd, &size)
 	nd.Faces = make([]*Face, size)
 	for i := 0; i < int(size); i++ {
-		f:=&Face{}
+		f := &Face{}
+		nd.Faces[i] = f
 		readLittleByte(rd, &f.Vertex)
 		var sz uint32
 		readLittleByte(rd, &sz)
-		if sz==1{
-			readLittleByte(rd, f.Nornmal)
+		if sz == 1 {
+			f.Normal = &[3]uint32{}
+			readLittleByte(rd, f.Normal)
 		}
 		readLittleByte(rd, &sz)
-		if sz==1{
+		if sz == 1 {
+			f.Uv = &[3]uint32{}
 			readLittleByte(rd, f.Uv)
 		}
 	}

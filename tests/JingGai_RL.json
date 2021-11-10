@@ -1,1 +1,34 @@
-{"metadata":{"formatVersion":3.1,"sourceFile":"JingGai_RL.obj","generatedBy":"OBJConverter","vertices":182,"faces":216,"normals":397,"uvs":334,"materials":1},"materials":[{"DbgColor":15658734,"DbgIndex":0,"DbgName":"phong1SG","colorAmbient":[0,0,0],"colorDiffuse":[1,1,1],"colorSpecular":[0,0,0],"illumination":4,"mapDiffuse":"JingGai_RL.jpg","opticalDensity":1,"specularCoef":0}],"buffers":"JingGai_RL.bin","topology":{"scale":0.13,"rotation":[0,0,0,1],"anchorcount":0,"anchors":[],"offset":[0,0,-0.09384010969268952]}}
+{
+  "metadata": {
+    "formatVersion": 3.1,
+    "sourceFile": "JingGai_RL.obj",
+    "generatedBy": "OBJConverter",
+    "vertices": 182,
+    "faces": 216,
+    "normals": 397,
+    "uvs": 334,
+    "materials": 1
+  },
+  "materials": [
+    {
+      "DbgColor": 15658734,
+      "DbgIndex": 0,
+      "DbgName": "phong1SG",
+      "colorAmbient": [0, 0, 0],
+      "colorDiffuse": [1, 1, 1],
+      "colorSpecular": [0, 0, 0],
+      "illumination": 4,
+      "mapDiffuse": "JingGai_RL.jpg",
+      "opticalDensity": 1,
+      "specularCoef": 0
+    }
+  ],
+  "buffers": "JingGai_RL.bin",
+  "topology": {
+    "scale": 0.13,
+    "rotation": [0, 0, 0, 1],
+    "anchorcount": 0,
+    "anchors": [],
+    "offset": [0, 0, -0.09384010969268952]
+  }
+}
