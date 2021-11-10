@@ -45,7 +45,6 @@ func ThreejsBin2Mst(fpath string) error {
 
 	mesh := NewMesh()
 	nd := &MeshNode{}
-	mesh.Nodes = append(mesh.Nodes, nd)
 	mat := mat4.Ident
 
 	var sc float32 = 1
@@ -237,6 +236,8 @@ func ThreejsBin2Mst(fpath string) error {
 		}
 		mesh.Materials = append(mesh.Materials, ml)
 	}
+	nd.ResortVtVn()
+	mesh.Nodes = append(mesh.Nodes, nd)
 	wt, _ := os.Create(mstPath)
 	MeshMarshal(wt, mesh)
 	wt.Close()

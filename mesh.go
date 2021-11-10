@@ -464,18 +464,6 @@ func MeshTriangleMarshal(wt io.Writer, nd *MeshTriangle) {
 	writeLittleByte(wt, uint32(len(nd.Faces)))
 	for _, f := range nd.Faces {
 		writeLittleByte(wt, &f.Vertex)
-		if f.Normal != nil {
-			writeLittleByte(wt, uint32(1))
-			writeLittleByte(wt, f.Normal)
-		} else {
-			writeLittleByte(wt, uint32(0))
-		}
-		if f.Uv != nil {
-			writeLittleByte(wt, uint32(1))
-			writeLittleByte(wt, f.Uv)
-		} else {
-			writeLittleByte(wt, uint32(0))
-		}
 	}
 }
 
@@ -489,17 +477,6 @@ func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
 		f := &Face{}
 		nd.Faces[i] = f
 		readLittleByte(rd, &f.Vertex)
-		var sz uint32
-		readLittleByte(rd, &sz)
-		if sz == 1 {
-			f.Normal = &[3]uint32{}
-			readLittleByte(rd, f.Normal)
-		}
-		readLittleByte(rd, &sz)
-		if sz == 1 {
-			f.Uv = &[3]uint32{}
-			readLittleByte(rd, f.Uv)
-		}
 	}
 	return &nd
 }
