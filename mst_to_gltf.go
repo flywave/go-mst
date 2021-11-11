@@ -88,7 +88,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 	var prewCreateMtlCount uint32 = 0
 	meshCount := len(doc.Meshes)
 	for _, nd := range mh.Nodes {
-		nd.ResortVtVn()
 		var bt []byte
 		bvSize := len(doc.BufferViews)
 		buf := bytes.NewBuffer(bt)

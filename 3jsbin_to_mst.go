@@ -53,18 +53,21 @@ func ThreejsBin2Mst(fpath string) error {
 		quat := quaternion.FromVec4(&vec4.T{float32(rot[0]), float32(rot[1]), float32(rot[2]), float32(rot[3])})
 		mat.AssignQuaternion(&quat)
 	}
+
 	if jsobj.Topology.Scale != 0 {
 		sc = float32(jsobj.Topology.Scale)
-		mat.Scaled(float32(sc))
 	}
-	off := jsobj.Topology.Offset
-	if len(off) != 0 {
-		mat.Translate(&vec3.T{float32(off[0]), float32(off[1]), float32(off[2])})
+	off := &vec3.T{}
+	if len(jsobj.Topology.Offset) != 0 {
+		of := jsobj.Topology.Offset
+		off = &vec3.T{float32(of[0]), float32(of[1]), float32(of[2])}
 	}
 	for i := range binobj.Vectilers {
 		v := (*vec3.T)(&binobj.Vectilers[i])
-		mat.MulVec3(v)
-		nd.Vertices = append(nd.Vertices, *v)
+		v1 := mat.MulVec3(v)
+		v1.Scale(sc)
+		v1.Add(off)
+		nd.Vertices = append(nd.Vertices, v1)
 	}
 
 	if len(binobj.Normals) > 0 {

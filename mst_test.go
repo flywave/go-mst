@@ -15,7 +15,7 @@ import (
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
 
 func TestToMst(t *testing.T) {
-	dirs := []string{"anchormodel"} //"anchormodel",
+	dirs := []string{"model"} //"anchormodel",
 	for _, d := range dirs {
 		dr := absPath + d
 		fs, _ := readDir(dr, dr, []string{".json"})
@@ -23,9 +23,7 @@ func TestToMst(t *testing.T) {
 			fpath := dr + f
 			mstPh := strings.Replace(fpath, ".json", ".mst", 1)
 			glbPh := strings.Replace(mstPh, ".mst", ".glb", 1)
-			if _, err := os.Stat(glbPh); !os.IsNotExist(err) {
-				continue
-			}
+
 			ThreejsBin2Mst(fpath)
 			f, _ := os.Open(mstPh)
 			mh := MeshUnMarshal(f)
@@ -38,17 +36,17 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf(t *testing.T) {
-	f, _ := os.Open("./tests/JingGai_RL.mst")
+	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/5025tiaoyaqi/5025tiyaqi.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("tests/JingGai_RL.gltf", bt, os.ModePerm)
+	ioutil.WriteFile("tests/5025tiyaqi.gltf", bt, os.ModePerm)
 }
 
 func TestBin(t *testing.T) {
-	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/5025tiaoyaqi/5025tiyaqi.json")
-	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/5025tiaoyaqi/5025tiyaqi.mst", "5025tiyaqi")
+	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/relijg/JingGai_RL.json")
+	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/relijg/JingGai_RL.mst", "JingGai_RL")
 
 }
 
@@ -95,15 +93,15 @@ func MstToObj(path, destName string) {
 			fl.Write([]byte(fmt.Sprintf("usemtl material_%d \n", g.Batchid)))
 			if hasvn && hasvt {
 				for _, face := range g.Faces {
-					fl.Write([]byte(fmt.Sprintf(faceTemp3, face.Vertex[0]+vertCount, face.Uv[0]+vertCount, face.Normal[0]+vertCount, face.Vertex[1]+vertCount, face.Uv[1]+vertCount, face.Normal[1]+vertCount, face.Vertex[2]+vertCount, face.Uv[2]+vertCount, face.Normal[2]+vertCount)))
+					fl.Write([]byte(fmt.Sprintf(faceTemp3, face.Vertex[0]+vertCount, face.Vertex[0]+vertCount, face.Vertex[0]+vertCount, face.Vertex[1]+vertCount, face.Vertex[1]+vertCount, face.Vertex[1]+vertCount, face.Vertex[2]+vertCount, face.Vertex[2]+vertCount, face.Vertex[2]+vertCount)))
 				}
 			} else if hasvn {
 				for _, face := range g.Faces {
-					fl.Write([]byte(fmt.Sprintf(faceTemp12, face.Vertex[0]+vertCount, face.Normal[0]+vertCount, face.Vertex[1]+vertCount, face.Normal[1]+vertCount, face.Vertex[2]+vertCount, face.Normal[2]+vertCount)))
+					fl.Write([]byte(fmt.Sprintf(faceTemp12, face.Vertex[0]+vertCount, face.Vertex[0]+vertCount, face.Vertex[1]+vertCount, face.Vertex[1]+vertCount, face.Vertex[2]+vertCount, face.Vertex[2]+vertCount)))
 				}
 			} else if hasvt {
 				for _, face := range g.Faces {
-					fl.Write([]byte(fmt.Sprintf(faceTemp21, face.Vertex[0]+vertCount, face.Uv[0]+vertCount, face.Vertex[1]+vertCount, face.Uv[1]+vertCount, face.Vertex[2]+vertCount, face.Uv[2]+vertCount)))
+					fl.Write([]byte(fmt.Sprintf(faceTemp21, face.Vertex[0]+vertCount, face.Vertex[0]+vertCount, face.Vertex[1]+vertCount, face.Vertex[1]+vertCount, face.Vertex[2]+vertCount, face.Vertex[2]+vertCount)))
 				}
 			} else {
 				for _, face := range g.Faces {
