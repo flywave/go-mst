@@ -69,14 +69,14 @@ type MeshMaterial interface {
 }
 
 type Texture struct {
-	Id         int32     `json:""`
-	Name       string    `json:""`
-	Size       [2]uint64 `json:""`
-	Format     uint16    `json:""`
-	Type       uint16    `json:""`
-	Compressed uint16    `json:""`
+	Id         int32     `json:"id"`
+	Name       string    `json:"name"`
+	Size       [2]uint64 `json:"size"`
+	Format     uint16    `json:"format"`
+	Type       uint16    `json:"type"`
+	Compressed uint16    `json:"compressed"`
 	Data       []byte    `json:"-"`
-	Repeated   bool
+	Repeated   bool      `json:"repeated"`
 }
 
 type BaseMaterial struct {
@@ -156,36 +156,31 @@ type MeshNode struct {
 }
 
 func (n *MeshNode) ResortVtVn() {
-	if len(n.Normals) != 0 {
-		nl := make([]vec3.T, len(n.Vertices))
-		for _, g := range n.FaceGroup {
-			for _, f := range g.Faces {
-				if f.Normal == nil {
-					break
-				}
-				nl[int(f.Vertex[0])] = n.Normals[int((*f.Normal)[0])]
-				nl[int(f.Vertex[1])] = n.Normals[int((*f.Normal)[1])]
-				nl[int(f.Vertex[2])] = n.Normals[int((*f.Normal)[2])]
-				f.Normal = &f.Vertex
+	var vs, vns []vec3.T
+	var vts []vec2.T
+	var idx uint32
+	for _, g := range n.FaceGroup {
+		for i, f := range g.Faces {
+			if f.Normal != nil {
+				vns = append(vns, n.Normals[int((*f.Normal)[0])])
+				vns = append(vns, n.Normals[int((*f.Normal)[1])])
+				vns = append(vns, n.Normals[int((*f.Normal)[2])])
 			}
-		}
-		n.Normals = nl
-	}
-	if len(n.TexCoords) != 0 {
-		vt := make([]vec2.T, len(n.Vertices))
-		for _, g := range n.FaceGroup {
-			for _, f := range g.Faces {
-				if f.Uv == nil {
-					break
-				}
-				vt[int(f.Vertex[0])] = n.TexCoords[int((*f.Uv)[0])]
-				vt[int(f.Vertex[1])] = n.TexCoords[int((*f.Uv)[1])]
-				vt[int(f.Vertex[2])] = n.TexCoords[int((*f.Uv)[2])]
-				f.Uv = &f.Vertex
+			if f.Uv != nil {
+				vts = append(vts, n.TexCoords[int((*f.Uv)[0])])
+				vts = append(vts, n.TexCoords[int((*f.Uv)[1])])
+				vts = append(vts, n.TexCoords[int((*f.Uv)[2])])
 			}
+			vs = append(vs, n.Vertices[int(f.Vertex[0])])
+			vs = append(vs, n.Vertices[int(f.Vertex[1])])
+			vs = append(vs, n.Vertices[int(f.Vertex[2])])
+			f.Vertex = [3]uint32{idx, uint32(idx + 1), uint32(idx + 2)}
+			idx = uint32(i*3 + 3)
 		}
-		n.TexCoords = vt
 	}
+	n.Vertices = vs
+	n.Normals = vns
+	n.TexCoords = vts
 }
 
 type InstanceMst struct {

@@ -37,6 +37,18 @@ func TestToMst(t *testing.T) {
 	}
 }
 
+func TestJingGai(t *testing.T) {
+	ThreejsBin2Mst("./tests/JingGai_RL.json")
+	MstToObj("./tests/JingGai_RL.mst", "JingGai_RL")
+	f, _ := os.Open("./tests/JingGai_RL.mst")
+	mh := MeshUnMarshal(f)
+	doc := CreateDoc()
+	BuildGltf(doc, mh)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("./tests/JingGai_RL.glb", bt, os.ModePerm)
+
+}
+
 func TestGltf(t *testing.T) {
 	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.mst")
 	mh := MeshUnMarshal(f)
@@ -58,7 +70,6 @@ func TestGltf1(t *testing.T) {
 func TestBin(t *testing.T) {
 	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
 	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.mst", "ZBRL_BY_1")
-
 }
 func TestBin2(t *testing.T) {
 	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.json")
