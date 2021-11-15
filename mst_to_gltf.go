@@ -275,7 +275,7 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 		mtl := mesh.Materials[i]
 
 		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.AlphaMask}
-		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{}
+		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{BaseColorFactor: &[4]float32{1, 1, 1, 1}}
 		cl := &[4]float32{1, 1, 1, 1}
 		var texMtl *TextureMaterial
 		switch ml := mtl.(type) {

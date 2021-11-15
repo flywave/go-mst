@@ -30,10 +30,6 @@ func ThreejsBin2Mst(fpath string) error {
 		return err
 	}
 	mstPath := strings.Replace(fpath, ".json", ".mst", 1)
-
-	// if _, err := os.Stat(mstPath); !os.IsNotExist(err) {
-	// 	return err
-	// }
 	jsobj, err := jsbin.ThreeJSObjFromJson(f)
 	if err != nil {
 		fmt.Println(err.Error())

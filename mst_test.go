@@ -23,7 +23,9 @@ func TestToMst(t *testing.T) {
 			fpath := dr + f
 			mstPh := strings.Replace(fpath, ".json", ".mst", 1)
 			glbPh := strings.Replace(mstPh, ".mst", ".glb", 1)
-
+			if _, err := os.Stat(mstPh); !os.IsNotExist(err) {
+				continue
+			}
 			ThreejsBin2Mst(fpath)
 			f, _ := os.Open(mstPh)
 			mh := MeshUnMarshal(f)
@@ -36,17 +38,31 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf(t *testing.T) {
-	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/5025tiaoyaqi/5025tiyaqi.mst")
+	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("tests/5025tiyaqi.gltf", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.glb", bt, os.ModePerm)
+}
+
+func TestGltf1(t *testing.T) {
+	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.mst")
+	mh := MeshUnMarshal(f)
+	doc := CreateDoc()
+	BuildGltf(doc, mh)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.glb", bt, os.ModePerm)
 }
 
 func TestBin(t *testing.T) {
-	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/relijg/JingGai_RL.json")
-	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/relijg/JingGai_RL.mst", "JingGai_RL")
+	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
+	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.mst", "ZBRL_BY_1")
+
+}
+func TestBin2(t *testing.T) {
+	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.json")
+	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.mst", "BGYbieshu2")
 
 }
 
