@@ -228,7 +228,7 @@ func ThreejsBin2Mst(fpath string) error {
 
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)
-			tex, err := convertTex(filepath.Join(dir, mtl.MapDiffuse), id)
+			tex, err := convertTex(dir, mtl.MapDiffuse, mtl.MapAlpha, id)
 			if err == nil {
 				ml.Texture = tex
 			}
@@ -276,11 +276,28 @@ func readDir(root, path string, ext_filter []string) ([]string, error) {
 	return res, nil
 }
 
-func convertTex(path string, texId int) (*Texture, error) {
-	f, err := os.Open(path)
+func convertTex(dir, diffuse, alpha string, texId int) (*Texture, error) {
+	f, err := os.Open(filepath.Join(dir, diffuse))
 	if err != nil {
 		return nil, err
 	}
+	var img2 image.Image
+	if alpha != "" {
+		f2, err := os.Open(filepath.Join(dir, alpha))
+		if err != nil {
+			return nil, err
+		}
+		_, ft, err := image.Decode(f2)
+		if err != nil {
+			return nil, err
+		}
+		f2.Seek(0, 0)
+		img2, err = readImage(f2, ft)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	_, ft, err := image.Decode(f)
 	if err != nil {
 		return nil, err
@@ -296,13 +313,18 @@ func convertTex(path string, texId int) (*Texture, error) {
 		for x := 0; x < bd.Dx(); x++ {
 			cl := img.At(x, y)
 			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			buf = append(buf, byte(r), byte(g), byte(b), byte(a))
+			var alpha byte = 1
+			if img2 != nil {
+				cl2 := img2.At(x, y)
+				a2, _, _, _ := color.RGBAModel.Convert(cl2).RGBA()
+				alpha = byte(byte(a2) / 255)
+			}
+			buf = append(buf, byte(r)*alpha, byte(g)*alpha, byte(b)*alpha, byte(a)*alpha)
 		}
 	}
-	_, name := filepath.Split(path)
 	t := &Texture{}
 	t.Id = int32(texId)
-	t.Name = name
+	t.Name = diffuse
 	t.Format = TEXTURE_FORMAT_RGBA
 	t.Size = [2]uint64{uint64(bd.Dx()), uint64(bd.Dy())}
 	t.Compressed = TEXTURE_COMPRESSED_ZLIB

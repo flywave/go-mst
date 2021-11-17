@@ -10,12 +10,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
 
 func TestToMst(t *testing.T) {
-	dirs := []string{"model"} //"anchormodel",
+	dirs := []string{"model"} //"anchormodel"
 	for _, d := range dirs {
 		dr := absPath + d
 		fs, _ := readDir(dr, dr, []string{".json"})
@@ -23,8 +24,11 @@ func TestToMst(t *testing.T) {
 			fpath := dr + f
 			mstPh := strings.Replace(fpath, ".json", ".mst", 1)
 			glbPh := strings.Replace(mstPh, ".mst", ".glb", 1)
-			if _, err := os.Stat(mstPh); !os.IsNotExist(err) {
-				continue
+			if info, err := os.Stat(mstPh); err == nil {
+				t := time.Date(2021, time.November, 16, 12, 40, 0, 0, time.UTC)
+				if info.ModTime().After(t) {
+					continue
+				}
 			}
 			ThreejsBin2Mst(fpath)
 			f, _ := os.Open(mstPh)
@@ -46,10 +50,9 @@ func TestJingGai(t *testing.T) {
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("./tests/JingGai_RL.glb", bt, os.ModePerm)
-
 }
 
-func TestGltf(t *testing.T) {
+func TestGltf3(t *testing.T) {
 	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
@@ -58,7 +61,8 @@ func TestGltf(t *testing.T) {
 	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.glb", bt, os.ModePerm)
 }
 
-func TestGltf1(t *testing.T) {
+func TestGltf(t *testing.T) {
+	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.json")
 	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
@@ -71,9 +75,25 @@ func TestBin(t *testing.T) {
 	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
 	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.mst", "ZBRL_BY_1")
 }
+
+func TestGltf2(t *testing.T) {
+	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
+	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.mst")
+	mh := MeshUnMarshal(f)
+	doc := CreateDoc()
+	BuildGltf(doc, mh)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.glb", bt, os.ModePerm)
+}
+
 func TestBin2(t *testing.T) {
 	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.json")
-	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.mst", "BGYbieshu2")
+	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.mst")
+	mh := MeshUnMarshal(f)
+	doc := CreateDoc()
+	BuildGltf(doc, mh)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.glb", bt, os.ModePerm)
 
 }
 

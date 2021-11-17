@@ -160,22 +160,30 @@ func (n *MeshNode) ResortVtVn() {
 	var vts []vec2.T
 	var idx uint32
 	for _, g := range n.FaceGroup {
-		for i, f := range g.Faces {
+		for _, f := range g.Faces {
 			if f.Normal != nil {
 				vns = append(vns, n.Normals[int((*f.Normal)[0])])
 				vns = append(vns, n.Normals[int((*f.Normal)[1])])
 				vns = append(vns, n.Normals[int((*f.Normal)[2])])
+			} else {
+				vns = append(vns, vec3.T{0, 0, 1})
+				vns = append(vns, vec3.T{0, 0, 1})
+				vns = append(vns, vec3.T{0, 0, 1})
 			}
 			if f.Uv != nil {
 				vts = append(vts, n.TexCoords[int((*f.Uv)[0])])
 				vts = append(vts, n.TexCoords[int((*f.Uv)[1])])
 				vts = append(vts, n.TexCoords[int((*f.Uv)[2])])
+			} else {
+				vts = append(vts, vec2.T{0, 0})
+				vts = append(vts, vec2.T{0, 0})
+				vts = append(vts, vec2.T{0, 0})
 			}
 			vs = append(vs, n.Vertices[int(f.Vertex[0])])
 			vs = append(vs, n.Vertices[int(f.Vertex[1])])
 			vs = append(vs, n.Vertices[int(f.Vertex[2])])
 			f.Vertex = [3]uint32{idx, uint32(idx + 1), uint32(idx + 2)}
-			idx = uint32(i*3 + 3)
+			idx += 3
 		}
 	}
 	n.Vertices = vs
