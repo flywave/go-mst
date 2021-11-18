@@ -280,9 +280,9 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 		var texMtl *TextureMaterial
 		switch ml := mtl.(type) {
 		case *BaseMaterial:
-			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 		case *PbrMaterial:
-			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			mc := float32(ml.Metallic)
 			gm.PBRMetallicRoughness.MetallicFactor = &mc
 			rs := float32(ml.Roughness)
@@ -292,13 +292,13 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2])
 			texMtl = &ml.TextureMaterial
 		case *LambertMaterial:
-			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
 		case *PhongMaterial:
-			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
 		case *TextureMaterial:
-			cl = &[4]float32{float32(ml.Color[0] / 255), float32(ml.Color[1] / 255), float32(ml.Color[2] / 255), 1 - float32(ml.Transparency)}
+			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = ml
 		}
 

@@ -224,7 +224,10 @@ func ThreejsBin2Mst(fpath string) error {
 			ml.Color[1] = byte(mtl.ColorDiffuse[1] * 255.0)
 			ml.Color[2] = byte(mtl.ColorDiffuse[2] * 255.0)
 		}
-		ml.Transparency = 1 - float32(mtl.Opacity)
+		ml.Transparency = 1
+		if mtl.Opacity != 0 {
+			ml.Transparency = 1 - float32(mtl.Opacity)
+		}
 
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)

@@ -52,6 +52,17 @@ func TestJingGai(t *testing.T) {
 	ioutil.WriteFile("./tests/JingGai_RL.glb", bt, os.ModePerm)
 }
 
+func TestJishuiqi(t *testing.T) {
+	ThreejsBin2Mst("./tests/BYjishuiqi.json")
+	MstToObj("./tests/BYjishuiqi.mst", "BYjishuiqi")
+	f, _ := os.Open("./tests/BYjishuiqi.mst")
+	mh := MeshUnMarshal(f)
+	doc := CreateDoc()
+	BuildGltf(doc, mh)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("./tests/BYjishuiqi.glb", bt, os.ModePerm)
+}
+
 func TestGltf3(t *testing.T) {
 	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.mst")
 	mh := MeshUnMarshal(f)
