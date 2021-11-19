@@ -10,13 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
 
 func TestToMst(t *testing.T) {
-	dirs := []string{"model"} //"anchormodel"
+	dirs := []string{"model", "anchormodel"} //
 	for _, d := range dirs {
 		dr := absPath + d
 		fs, _ := readDir(dr, dr, []string{".json"})
@@ -24,12 +23,12 @@ func TestToMst(t *testing.T) {
 			fpath := dr + f
 			mstPh := strings.Replace(fpath, ".json", ".mst", 1)
 			glbPh := strings.Replace(mstPh, ".mst", ".glb", 1)
-			if info, err := os.Stat(mstPh); err == nil {
-				t := time.Date(2021, time.November, 16, 12, 40, 0, 0, time.UTC)
-				if info.ModTime().After(t) {
-					continue
-				}
-			}
+			// if info, err := os.Stat(mstPh); err == nil {
+			// 	t := time.Date(2021, time.November, 16, 12, 40, 0, 0, time.UTC)
+			// 	if info.ModTime().After(t) {
+			// 		continue
+			// 	}
+			// }
 			ThreejsBin2Mst(fpath)
 			f, _ := os.Open(mstPh)
 			mh := MeshUnMarshal(f)
