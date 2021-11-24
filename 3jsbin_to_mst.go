@@ -24,12 +24,15 @@ import (
 	"golang.org/x/image/bmp"
 )
 
-func ThreejsBin2Mst(fpath string) error {
+func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 	f, err := os.Open(fpath)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	mstPath := strings.Replace(fpath, ".json", ".mst", 1)
+	// mstPath := strings.Replace(fpath, ".json", ".mst", 1)
+	// if _, err := os.Stat(mstPath); !os.IsNotExist(err) {
+	// 	return err
+	// }
 	jsobj, err := jsbin.ThreeJSObjFromJson(f)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -224,14 +227,11 @@ func ThreejsBin2Mst(fpath string) error {
 			ml.Color[1] = byte(mtl.ColorDiffuse[1] * 255.0)
 			ml.Color[2] = byte(mtl.ColorDiffuse[2] * 255.0)
 		}
-		ml.Transparency = 0
-		if mtl.Opacity != 0 {
-			ml.Transparency = 1 - float32(mtl.Opacity)
-		}
+		ml.Transparency = 1 - float32(mtl.Opacity)
 
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)
-			tex, err := convertTex(dir, mtl.MapDiffuse, mtl.MapAlpha, id)
+			tex, err := convertTex(filepath.Join(dir, mtl.MapDiffuse), id)
 			if err == nil {
 				ml.Texture = tex
 			}
@@ -240,10 +240,10 @@ func ThreejsBin2Mst(fpath string) error {
 	}
 	nd.ResortVtVn()
 	mesh.Nodes = append(mesh.Nodes, nd)
-	wt, _ := os.Create(mstPath)
-	MeshMarshal(wt, mesh)
-	wt.Close()
-	return nil
+	// wt, _ := os.Create(mstPath)
+	// MeshMarshal(wt, mesh)
+	// wt.Close()
+	return mesh, nil
 }
 
 func readDir(root, path string, ext_filter []string) ([]string, error) {
@@ -279,28 +279,11 @@ func readDir(root, path string, ext_filter []string) ([]string, error) {
 	return res, nil
 }
 
-func convertTex(dir, diffuse, alpha string, texId int) (*Texture, error) {
-	f, err := os.Open(filepath.Join(dir, diffuse))
+func convertTex(path string, texId int) (*Texture, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	var img2 image.Image
-	if alpha != "" {
-		f2, err := os.Open(filepath.Join(dir, alpha))
-		if err != nil {
-			return nil, err
-		}
-		_, ft, err := image.Decode(f2)
-		if err != nil {
-			return nil, err
-		}
-		f2.Seek(0, 0)
-		img2, err = readImage(f2, ft)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	_, ft, err := image.Decode(f)
 	if err != nil {
 		return nil, err
@@ -316,18 +299,13 @@ func convertTex(dir, diffuse, alpha string, texId int) (*Texture, error) {
 		for x := 0; x < bd.Dx(); x++ {
 			cl := img.At(x, y)
 			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			var alpha byte = 1
-			if img2 != nil {
-				cl2 := img2.At(x, y)
-				a2, _, _, _ := color.RGBAModel.Convert(cl2).RGBA()
-				alpha = byte(byte(a2) / 255)
-			}
-			buf = append(buf, byte(r)*alpha, byte(g)*alpha, byte(b)*alpha, byte(a)*alpha)
+			buf = append(buf, byte(r), byte(g), byte(b), byte(a))
 		}
 	}
+	_, name := filepath.Split(path)
 	t := &Texture{}
 	t.Id = int32(texId)
-	t.Name = diffuse
+	t.Name = name
 	t.Format = TEXTURE_FORMAT_RGBA
 	t.Size = [2]uint64{uint64(bd.Dx()), uint64(bd.Dy())}
 	t.Compressed = TEXTURE_COMPRESSED_ZLIB
