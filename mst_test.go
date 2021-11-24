@@ -29,37 +29,16 @@ func TestToMst(t *testing.T) {
 			// 		continue
 			// 	}
 			// }
-			ThreejsBin2Mst(fpath)
-			f, _ := os.Open(mstPh)
-			mh := MeshUnMarshal(f)
+			mh, _ := ThreejsBin2Mst(fpath)
+			f, _ := os.Create(mstPh)
+			MeshMarshal(f, mh)
+			f.Close()
 			doc := CreateDoc()
 			BuildGltf(doc, mh)
 			bt, _ := GetGltfBinary(doc, 8)
 			ioutil.WriteFile(glbPh, bt, os.ModePerm)
 		}
 	}
-}
-
-func TestJingGai(t *testing.T) {
-	ThreejsBin2Mst("./tests/JingGai_RL.json")
-	MstToObj("./tests/JingGai_RL.mst", "JingGai_RL")
-	f, _ := os.Open("./tests/JingGai_RL.mst")
-	mh := MeshUnMarshal(f)
-	doc := CreateDoc()
-	BuildGltf(doc, mh)
-	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("./tests/JingGai_RL.glb", bt, os.ModePerm)
-}
-
-func TestJishuiqi(t *testing.T) {
-	ThreejsBin2Mst("./tests/BYjishuiqi.json")
-	MstToObj("./tests/BYjishuiqi.mst", "BYjishuiqi")
-	f, _ := os.Open("./tests/BYjishuiqi.mst")
-	mh := MeshUnMarshal(f)
-	doc := CreateDoc()
-	BuildGltf(doc, mh)
-	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("./tests/BYjishuiqi.glb", bt, os.ModePerm)
 }
 
 func TestGltf3(t *testing.T) {
@@ -72,24 +51,16 @@ func TestGltf3(t *testing.T) {
 }
 
 func TestGltf(t *testing.T) {
-	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.json")
-	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.mst")
-	mh := MeshUnMarshal(f)
+	mesh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.json")
 	doc := CreateDoc()
-	BuildGltf(doc, mh)
+	BuildGltf(doc, mesh)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.glb", bt, os.ModePerm)
 }
 
-func TestBin(t *testing.T) {
-	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
-	MstToObj("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.mst", "ZBRL_BY_1")
-}
-
 func TestGltf2(t *testing.T) {
-	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
-	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.mst")
-	mh := MeshUnMarshal(f)
+	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
+
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)
@@ -97,9 +68,7 @@ func TestGltf2(t *testing.T) {
 }
 
 func TestBin2(t *testing.T) {
-	ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.json")
-	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.mst")
-	mh := MeshUnMarshal(f)
+	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.json")
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)

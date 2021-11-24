@@ -29,10 +29,7 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	// mstPath := strings.Replace(fpath, ".json", ".mst", 1)
-	// if _, err := os.Stat(mstPath); !os.IsNotExist(err) {
-	// 	return err
-	// }
+
 	jsobj, err := jsbin.ThreeJSObjFromJson(f)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -240,9 +237,6 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 	}
 	nd.ResortVtVn()
 	mesh.Nodes = append(mesh.Nodes, nd)
-	// wt, _ := os.Create(mstPath)
-	// MeshMarshal(wt, mesh)
-	// wt.Close()
 	return mesh, nil
 }
 
