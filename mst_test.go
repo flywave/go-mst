@@ -10,6 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	proj "github.com/flywave/go-proj"
+	"github.com/flywave/go3d/float64/vec3"
+	fvec3 "github.com/flywave/go3d/vec3"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
@@ -74,6 +78,10 @@ func TestBin2(t *testing.T) {
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.glb", bt, os.ModePerm)
 
+}
+
+func TestPipe2(t *testing.T) {
+	MstToObj("tests/559e1629611da5176872bf5c.mst", "pvc")
 }
 
 func MstToObj(path, destName string) {
@@ -199,5 +207,35 @@ func MstToObj(path, destName string) {
 			// }
 			mtlTex.Write([]byte(fmt.Sprintf("Kd %f %f %f  \n", float32(cl[0])/255, float32(cl[1])/255, float32(cl[2])/255)))
 		}
+	}
+}
+
+func TestVec(t *testing.T) {
+	world := &vec3.T{-2389250.4338499242, 4518270.200871248, 3802675.424745363}
+	head := &vec3.T{4.771371435839683, -0.753607839345932, 3.867249683942646}
+	p := &vec3.T{4.802855, -0.753608, 3.828406}
+	fmt.Println(p.Add(world).Length())
+	world.Add(head)
+	x, y, z, _ := proj.Ecef2Lonlat(p[0], p[1], p[2])
+	fmt.Println(x, y, z)
+}
+
+func TestPipe(t *testing.T) {
+	pos := []*fvec3.T{
+		{-45.6055285647, 197.900406907, 631.169545605},
+		{-55.3296683, 217.775199322, 601.643433287},
+		{-57.99762254, 223.04394682, 593.7597909383},
+	}
+	lines := []string{"/home/hj/workspace/GISCore/build/temp/mst/yanshi/ys_zq_mdb/line/1.mst", "/home/hj/workspace/GISCore/build/temp/mst/yanshi/ys_zq_mdb/line/2.mst", "/home/hj/workspace/GISCore/build/temp/mst/yanshi/ys_zq_mdb/line/3.mst"}
+	lines2 := []string{"tests/0.mst", "tests/1.mst", "tests/2.mst"}
+	for i := 0; i < 3; i++ {
+		ms, _ := MeshReadFrom(lines[i])
+		for _, nd := range ms.Nodes {
+			for k := range nd.Vertices {
+				nd.Vertices[k].Add(pos[i])
+			}
+		}
+		MeshWriteTo(lines2[i], ms)
+		MstToObj(lines2[i], fmt.Sprintf("%d", i))
 	}
 }

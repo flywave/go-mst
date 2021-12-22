@@ -681,6 +681,7 @@ func MeshReadFrom(path string) (*Mesh, error) {
 	if e != nil {
 		return nil, e
 	}
+	defer f.Close()
 	return MeshUnMarshal(f), nil
 }
 
@@ -690,6 +691,7 @@ func MeshWriteTo(path string, ms *Mesh) error {
 	if e != nil {
 		return e
 	}
+	defer f.Close()
 	MeshMarshal(f, ms)
 	return nil
 }
