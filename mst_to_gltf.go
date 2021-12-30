@@ -168,10 +168,9 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		aftIndices := uint32(len(nd.FaceGroup))
 		idx := uint32(len(doc.Accessors))
 		indexPos := aftIndices + idx
-		indexTc := indexPos + 1
-		indexNl := indexPos + 2
 		var start uint32 = 0
 		for i := range nd.FaceGroup {
+			tmp := indexPos
 			patch := nd.FaceGroup[i]
 			mtl := mh.Materials[int(patch.Batchid)]
 			var mtl_id uint32
@@ -192,10 +191,12 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 
 			ps.Attributes["POSITION"] = indexPos
 			if len(nd.TexCoords) > 0 && mtl.HasTexture() {
-				ps.Attributes["TEXCOORD_0"] = indexTc
+				tmp++
+				ps.Attributes["TEXCOORD_0"] = tmp
 			}
 			if len(nd.Normals) > 0 {
-				ps.Attributes["NORMAL"] = indexNl
+				tmp++
+				ps.Attributes["NORMAL"] = tmp
 			}
 			ps.Mode = gltf.PrimitiveTriangles
 			mtlId := uint32(patch.Batchid) + uint32(len(doc.Materials))
