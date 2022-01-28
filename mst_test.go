@@ -14,6 +14,7 @@ import (
 	proj "github.com/flywave/go-proj"
 	"github.com/flywave/go3d/float64/vec3"
 	fvec3 "github.com/flywave/go3d/vec3"
+	"github.com/qmuntal/gltf"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
@@ -72,16 +73,20 @@ func TestGltf2(t *testing.T) {
 }
 
 func TestBin2(t *testing.T) {
-	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.json")
+	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.json")
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/public/BGYbieshu2/BGYbieshu2.glb", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.glb", bt, os.ModePerm)
 
 }
 
 func TestPipe2(t *testing.T) {
 	MstToObj("tests/559e1629611da5176872bf5c.mst", "pvc")
+}
+
+func TestDe(t *testing.T) {
+	gltf.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.glb")
 }
 
 func MstToObj(path, destName string) {
