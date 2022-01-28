@@ -34,9 +34,9 @@ func TestToMst(t *testing.T) {
 			// 		continue
 			// 	}
 			// }
-			mh, _ := ThreejsBin2Mst(fpath)
-			f, _ := os.Create(mstPh)
-			MeshMarshal(f, mh)
+			// mh, _ := ThreejsBin2Mst(fpath)
+			f, _ := os.Open(mstPh)
+			mh := MeshUnMarshal(f)
 			f.Close()
 			doc := CreateDoc()
 			BuildGltf(doc, mh)
@@ -73,11 +73,11 @@ func TestGltf2(t *testing.T) {
 }
 
 func TestBin2(t *testing.T) {
-	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.json")
+	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.json")
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.glb", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.glb", bt, os.ModePerm)
 
 }
 
@@ -86,6 +86,7 @@ func TestPipe2(t *testing.T) {
 }
 
 func TestDe(t *testing.T) {
+	gltf.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.glb")
 	gltf.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.glb")
 }
 

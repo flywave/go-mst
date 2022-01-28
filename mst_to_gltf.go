@@ -94,7 +94,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		bvSize := len(doc.BufferViews)
 		buf := bytes.NewBuffer(bt)
 		indecs := &gltf.BufferView{}
-		indecs.ByteOffset = uint32(buf.Len())
+		indecs.ByteOffset = buffer.ByteLength
 		for _, g := range nd.FaceGroup {
 			for _, f := range g.Faces {
 				binary.Write(buf, binary.LittleEndian, f.Vertex)
@@ -148,7 +148,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		for i := range nd.FaceGroup {
 			tmp := indexPos
 			patch := nd.FaceGroup[i]
-			mtl := mh.Materials[int(patch.Batchid)]
 			var mtl_id uint32
 			if m, ok := mtlMap[uint32(patch.Batchid)]; ok {
 				mtl_id = m
@@ -166,7 +165,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			ps.Indices = &index
 
 			ps.Attributes["POSITION"] = indexPos
-			if len(nd.TexCoords) > 0 && mtl.HasTexture() {
+			if len(nd.TexCoords) > 0 {
 				tmp++
 				ps.Attributes["TEXCOORD_0"] = tmp
 			}
@@ -194,7 +193,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		posacc.ComponentType = gltf.ComponentFloat
 		posacc.Type = gltf.AccessorVec3
 		posacc.Count = uint32(len(nd.Vertices))
-		posacc.ByteOffset = postions.ByteOffset
 
 		posacc.BufferView = &bvPos
 		box := nd.GetBoundbox()
@@ -207,7 +205,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			texacc.ComponentType = gltf.ComponentFloat
 			texacc.Type = gltf.AccessorVec2
 			texacc.Count = uint32(len(nd.TexCoords))
-			texacc.ByteOffset = texcood.ByteOffset
 			texacc.BufferView = &bvTexc
 			doc.Accessors = append(doc.Accessors, texacc)
 		}
@@ -217,7 +214,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			nlacc.ComponentType = gltf.ComponentFloat
 			nlacc.Type = gltf.AccessorVec3
 			nlacc.Count = uint32(len(nd.Normals))
-			nlacc.ByteOffset = normalView.ByteOffset
 			nlacc.BufferView = &bvNl
 			doc.Accessors = append(doc.Accessors, nlacc)
 		}
@@ -309,8 +305,7 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 			imgBuffView := &gltf.BufferView{}
 			imgBuffView.ByteOffset = buffer.ByteLength
 			imgBuffView.ByteLength = uint32(buf.Len())
-			imgBuffView.Buffer = uint32(len(doc.Buffers))
-
+			imgBuffView.Buffer = 0
 			buffer.ByteLength += uint32(buf.Len())
 			buffer.Data = append(buffer.Data, buf.Bytes()...)
 
