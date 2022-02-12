@@ -41,7 +41,6 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 
 	mesh := NewMesh()
 	nd := &MeshNode{}
-	mat := mat4.Ident
 
 	var sc float32 = 1
 	rot := jsobj.Topology.Rotation
@@ -58,7 +57,7 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 		of := jsobj.Topology.Offset
 		off = vec3.T{float32(of[0]), float32(of[1]), float32(of[2])}
 	}
-	mat4.Compose(&off, &quat, &vec3.T{sc, sc, sc})
+	mat := mat4.Compose(&off, &quat, &vec3.T{sc, sc, sc})
 	for i := range binobj.Vectilers {
 		v := (*vec3.T)(&binobj.Vectilers[i])
 		v1 := mat.MulVec3(v)
