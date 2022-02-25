@@ -223,6 +223,9 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 			ml.Color[2] = byte(mtl.ColorDiffuse[2] * 255.0)
 		}
 		ml.Transparency = 1 - float32(mtl.Opacity)
+		if ml.Transparency == 1 {
+			ml.Transparency = 0
+		}
 
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)
@@ -234,6 +237,7 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 		mesh.Materials = append(mesh.Materials, ml)
 	}
 	nd.ResortVtVn()
+	// nd.ReComputeNormal()
 	mesh.Nodes = append(mesh.Nodes, nd)
 	return mesh, nil
 }

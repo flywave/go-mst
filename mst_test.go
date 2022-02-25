@@ -1,6 +1,7 @@
 package mst
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -34,14 +35,18 @@ func TestToMst(t *testing.T) {
 			// 		continue
 			// 	}
 			// }
-			// mh, _ := ThreejsBin2Mst(fpath)
-			f, _ := os.Open(mstPh)
-			mh := MeshUnMarshal(f)
-			f.Close()
+			mh, _ := ThreejsBin2Mst(fpath)
+			// f, _ := os.Open(mstPh)
+			// mh := MeshUnMarshal(f)
+			// f.Close()
 			doc := CreateDoc()
 			BuildGltf(doc, mh)
 			bt, _ := GetGltfBinary(doc, 8)
 			ioutil.WriteFile(glbPh, bt, os.ModePerm)
+
+			wt := bytes.NewBuffer([]byte{})
+			MeshMarshal(wt, mh)
+			ioutil.WriteFile(mstPh, wt.Bytes(), os.ModePerm)
 		}
 	}
 }
@@ -56,11 +61,11 @@ func TestGltf3(t *testing.T) {
 }
 
 func TestGltf(t *testing.T) {
-	mesh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.json")
+	mesh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/HHRQQiTiWoLunLiuLiangJi/HHRQQiTiWoLunLiuLiangJi.json")
 	doc := CreateDoc()
 	BuildGltf(doc, mesh)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.glb", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/public/HHRQQiTiWoLunLiuLiangJi/HHRQQiTiWoLunLiuLiangJi.glb", bt, os.ModePerm)
 }
 
 func TestGltf2(t *testing.T) {
