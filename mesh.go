@@ -4,17 +4,26 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
+	"errors"
 	"image"
 	"image/color"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
+	"github.com/ftrvxmtrx/tga"
+	"golang.org/x/image/bmp"
+	"golang.org/x/image/tiff"
 )
 
 const MESH_SIGNATURE string = "fwtm"
@@ -753,4 +762,59 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 		}
 	}
 	return img, nil
+}
+
+func CreateTexture(name string, repet bool) (*Texture, error) {
+	file, err := os.Open(name)
+	defer file.Close()
+	if err != nil {
+		return nil, err
+	}
+	buf, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	format := path.Ext(name)
+	if format != "" {
+		format = format[1:]
+	} else {
+		format = "jpg"
+	}
+	format = strings.ToLower(format)
+	reader := bytes.NewBuffer([]byte(buf))
+	var img image.Image
+	switch format {
+	case "jpeg", "jpg":
+		img, err = jpeg.Decode(reader)
+	case "tga":
+		img, err = tga.Decode(reader)
+	case "png":
+		img, err = png.Decode(reader)
+	case "gif":
+		img, err = gif.Decode(reader)
+	case "bmp":
+		img, err = bmp.Decode(reader)
+	case "tif", "tiff":
+		img, err = tiff.Decode(reader)
+	default:
+		return nil, errors.New("unknow format")
+	}
+
+	bd := img.Bounds()
+	buf1 := []byte{}
+	for y := 0; y < bd.Dy(); y++ {
+		for x := 0; x < bd.Dx(); x++ {
+			cl := img.At(x, y)
+			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
+			buf1 = append(buf, byte(r), byte(g), byte(b), byte(a))
+		}
+	}
+
+	t := &Texture{}
+	t.Format = TEXTURE_FORMAT_RGBA
+	t.Size = [2]uint64{uint64(bd.Dx()), uint64(bd.Dy())}
+	t.Compressed = TEXTURE_COMPRESSED_ZLIB
+	t.Data = CompressImage(buf1)
+	t.Repeated = repet
+	return t, err
 }
