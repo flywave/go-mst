@@ -87,12 +87,14 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 	mtlMap := make(map[uint32]uint32)
 	var prewCreateMtlCount uint32 = 0
 	meshCount := len(doc.Meshes)
+	buffer := &gltf.Buffer{}
+
 	for _, nd := range mh.Nodes {
 		var bt []byte
 		bvSize := len(doc.BufferViews)
 		buf := bytes.NewBuffer(bt)
 		indecs := &gltf.BufferView{}
-		indecs.ByteOffset = uint32(buf.Len())
+		indecs.ByteOffset = buffer.ByteLength
 		for _, g := range nd.FaceGroup {
 			for _, f := range g.Faces {
 				binary.Write(buf, binary.LittleEndian, f.Vertex)
@@ -102,61 +104,35 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		indecs.Buffer = uint32(len(doc.Buffers))
 		doc.BufferViews = append(doc.BufferViews, indecs)
 
-		buffer := &gltf.Buffer{}
-		buffer.ByteLength = uint32(buf.Len())
-		buffer.Data = buf.Bytes()
-		buffer.EmbeddedResource()
-		doc.Buffers = append(doc.Buffers, buffer)
-
-		buf2 := bytes.NewBuffer(bt)
 		postions := &gltf.BufferView{}
-		postions.ByteOffset = uint32(buf2.Len())
-		binary.Write(buf2, binary.LittleEndian, nd.Vertices)
-		postions.ByteLength = uint32(buf2.Len()) - postions.ByteOffset
+		postions.ByteOffset = uint32(buf.Len())
+		binary.Write(buf, binary.LittleEndian, nd.Vertices)
+		postions.ByteLength = uint32(buf.Len()) - postions.ByteOffset
 		postions.Buffer = uint32(len(doc.Buffers))
 		bvPos := uint32(len(doc.BufferViews))
 		doc.BufferViews = append(doc.BufferViews, postions)
 
-		buffer2 := &gltf.Buffer{}
-		buffer2.ByteLength = uint32(buf2.Len())
-		buffer2.Data = buf2.Bytes()
-		buffer2.EmbeddedResource()
-		doc.Buffers = append(doc.Buffers, buffer2)
-
 		texcood := &gltf.BufferView{}
 		bvTexc := uint32(len(doc.BufferViews))
 		if len(nd.TexCoords) > 0 {
-			buf3 := bytes.NewBuffer(bt)
-			texcood.ByteOffset = uint32(buf3.Len())
-			binary.Write(buf3, binary.LittleEndian, nd.TexCoords)
-			texcood.ByteLength = uint32(buf3.Len()) - texcood.ByteOffset
+			texcood.ByteOffset = uint32(buf.Len())
+			binary.Write(buf, binary.LittleEndian, nd.TexCoords)
+			texcood.ByteLength = uint32(buf.Len()) - texcood.ByteOffset
 			texcood.Buffer = uint32(len(doc.Buffers))
 			doc.BufferViews = append(doc.BufferViews, texcood)
-
-			buffer3 := &gltf.Buffer{}
-			buffer3.ByteLength = uint32(buf3.Len())
-			buffer3.Data = buf3.Bytes()
-			buffer3.EmbeddedResource()
-			doc.Buffers = append(doc.Buffers, buffer3)
 		}
 
 		normalView := &gltf.BufferView{}
 		bvNl := uint32(len(doc.BufferViews))
 		if len(nd.Normals) > 0 {
-			buf4 := bytes.NewBuffer(bt)
-			normalView.ByteOffset = uint32(buf4.Len())
-			binary.Write(buf4, binary.LittleEndian, nd.Normals)
-			normalView.ByteLength = uint32(buf4.Len()) - normalView.ByteOffset
+			normalView.ByteOffset = uint32(buf.Len())
+			binary.Write(buf, binary.LittleEndian, nd.Normals)
+			normalView.ByteLength = uint32(buf.Len()) - normalView.ByteOffset
 			normalView.Buffer = uint32(len(doc.Buffers))
 			doc.BufferViews = append(doc.BufferViews, normalView)
-
-			buffer4 := &gltf.Buffer{}
-			buffer4.ByteLength = uint32(buf4.Len())
-			buffer4.Data = buf4.Bytes()
-			buffer4.EmbeddedResource()
-
-			doc.Buffers = append(doc.Buffers, buffer4)
 		}
+		buffer.ByteLength += uint32(buf.Len())
+		buffer.Data = append(buffer.Data, buf.Bytes()...)
 
 		mesh := &gltf.Mesh{}
 		doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
@@ -168,12 +144,10 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		aftIndices := uint32(len(nd.FaceGroup))
 		idx := uint32(len(doc.Accessors))
 		indexPos := aftIndices + idx
-		indexTc := indexPos + 1
-		indexNl := indexPos + 2
 		var start uint32 = 0
 		for i := range nd.FaceGroup {
+			tmp := indexPos
 			patch := nd.FaceGroup[i]
-			mtl := mh.Materials[int(patch.Batchid)]
 			var mtl_id uint32
 			if m, ok := mtlMap[uint32(patch.Batchid)]; ok {
 				mtl_id = m
@@ -191,11 +165,13 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			ps.Indices = &index
 
 			ps.Attributes["POSITION"] = indexPos
-			if len(nd.TexCoords) > 0 && mtl.HasTexture() {
-				ps.Attributes["TEXCOORD_0"] = indexTc
+			if len(nd.TexCoords) > 0 {
+				tmp++
+				ps.Attributes["TEXCOORD_0"] = tmp
 			}
 			if len(nd.Normals) > 0 {
-				ps.Attributes["NORMAL"] = indexNl
+				tmp++
+				ps.Attributes["NORMAL"] = tmp
 			}
 			ps.Mode = gltf.PrimitiveTriangles
 			mtlId := uint32(patch.Batchid) + uint32(len(doc.Materials))
@@ -217,7 +193,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		posacc.ComponentType = gltf.ComponentFloat
 		posacc.Type = gltf.AccessorVec3
 		posacc.Count = uint32(len(nd.Vertices))
-		posacc.ByteOffset = postions.ByteOffset
 
 		posacc.BufferView = &bvPos
 		box := nd.GetBoundbox()
@@ -230,7 +205,6 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			texacc.ComponentType = gltf.ComponentFloat
 			texacc.Type = gltf.AccessorVec2
 			texacc.Count = uint32(len(nd.TexCoords))
-			texacc.ByteOffset = texcood.ByteOffset
 			texacc.BufferView = &bvTexc
 			doc.Accessors = append(doc.Accessors, texacc)
 		}
@@ -240,12 +214,12 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 			nlacc.ComponentType = gltf.ComponentFloat
 			nlacc.Type = gltf.AccessorVec3
 			nlacc.Count = uint32(len(nd.Normals))
-			nlacc.ByteOffset = normalView.ByteOffset
 			nlacc.BufferView = &bvNl
 			doc.Accessors = append(doc.Accessors, nlacc)
 		}
 		doc.Meshes = append(doc.Meshes, mesh)
 	}
+	doc.Buffers = append(doc.Buffers, buffer)
 	for _, inst := range mh.InstanceNode {
 		meshId := inst.MeshNodeId + uint32(meshCount)
 		for _, mt := range inst.Transfors {
@@ -263,6 +237,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		}
 	}
 	e := fillMaterials(doc, mh)
+
 	if e != nil {
 		return e
 	}
@@ -271,6 +246,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 
 func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 	texMap := make(map[int32]uint32)
+	buffer := doc.Buffers[0]
 	for i := range mesh.Materials {
 		mtl := mesh.Materials[i]
 
@@ -327,18 +303,13 @@ func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
 			png.Encode(buf, img)
 
 			imgBuffView := &gltf.BufferView{}
-			imgBuffView.ByteOffset = 0
+			imgBuffView.ByteOffset = buffer.ByteLength
 			imgBuffView.ByteLength = uint32(buf.Len())
-			imgBuffView.Buffer = uint32(len(doc.Buffers))
-
-			buffer := &gltf.Buffer{}
-			buffer.ByteLength = uint32(buf.Len())
-			buffer.Data = buf.Bytes()
-			buffer.EmbeddedResource()
+			imgBuffView.Buffer = 0
+			buffer.ByteLength += uint32(buf.Len())
+			buffer.Data = append(buffer.Data, buf.Bytes()...)
 
 			doc.BufferViews = append(doc.BufferViews, imgBuffView)
-			doc.Buffers = append(doc.Buffers, buffer)
-
 			doc.Images = append(doc.Images, gimg)
 
 			var sp *gltf.Sampler

@@ -41,28 +41,26 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 
 	mesh := NewMesh()
 	nd := &MeshNode{}
-	mat := mat4.Ident
 
 	var sc float32 = 1
 	rot := jsobj.Topology.Rotation
+	var quat quaternion.T
 	if len(rot) != 0 {
-		quat := quaternion.FromVec4(&vec4.T{float32(rot[0]), float32(rot[1]), float32(rot[2]), float32(rot[3])})
-		mat.AssignQuaternion(&quat)
+		quat = quaternion.FromVec4(&vec4.T{float32(rot[0]), float32(rot[1]), float32(rot[2]), float32(rot[3])})
 	}
 
 	if jsobj.Topology.Scale != 0 {
 		sc = float32(jsobj.Topology.Scale)
 	}
-	off := &vec3.T{}
+	off := vec3.T{}
 	if len(jsobj.Topology.Offset) != 0 {
 		of := jsobj.Topology.Offset
-		off = &vec3.T{float32(of[0]), float32(of[1]), float32(of[2])}
+		off = vec3.T{float32(of[0]), float32(of[1]), float32(of[2])}
 	}
+	mat := mat4.Compose(&off, &quat, &vec3.T{sc, sc, sc})
 	for i := range binobj.Vectilers {
 		v := (*vec3.T)(&binobj.Vectilers[i])
 		v1 := mat.MulVec3(v)
-		v1.Scale(sc)
-		v1.Add(off)
 		nd.Vertices = append(nd.Vertices, v1)
 	}
 
@@ -225,6 +223,9 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 			ml.Color[2] = byte(mtl.ColorDiffuse[2] * 255.0)
 		}
 		ml.Transparency = 1 - float32(mtl.Opacity)
+		if ml.Transparency == 1 {
+			ml.Transparency = 0
+		}
 
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)
@@ -236,6 +237,7 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 		mesh.Materials = append(mesh.Materials, ml)
 	}
 	nd.ResortVtVn()
+	// nd.ReComputeNormal()
 	mesh.Nodes = append(mesh.Nodes, nd)
 	return mesh, nil
 }
