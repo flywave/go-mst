@@ -87,7 +87,7 @@ func TestBin2(t *testing.T) {
 }
 
 func TestPipe2(t *testing.T) {
-	MstToObj("tests/559e1629611da5176872bf5c.mst", "pvc")
+	MstToObj("tests/BYjishuiqi.mst", "pvc")
 }
 
 func TestDe(t *testing.T) {
