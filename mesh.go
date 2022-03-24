@@ -858,6 +858,8 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 	}
 
 	t := &Texture{}
+	_, fn := filepath.Split(name)
+	t.Name = fn
 	t.Format = TEXTURE_FORMAT_RGBA
 	t.Size = [2]uint64{uint64(bd.Dx()), uint64(bd.Dy())}
 	t.Compressed = TEXTURE_COMPRESSED_ZLIB
