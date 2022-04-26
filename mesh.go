@@ -21,7 +21,6 @@ import (
 	dmat "github.com/flywave/go3d/float64/mat4"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
-	"github.com/ftrvxmtrx/tga"
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/tiff"
 )
@@ -833,8 +832,6 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 	switch format {
 	case "jpeg", "jpg":
 		img, err = jpeg.Decode(reader)
-	case "tga":
-		img, err = tga.Decode(reader)
 	case "png":
 		img, err = png.Decode(reader)
 	case "gif":
