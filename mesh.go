@@ -247,7 +247,7 @@ func triangleArea(a, b *vec3.T) float64 {
 type InstanceMst struct {
 	Transfors []*dmat.T
 	BBox      *[6]float64
-	Mesh      *Mesh
+	Mesh      *BaseMesh
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -269,10 +269,14 @@ func (nd *MeshNode) GetBoundbox() *[6]float64 {
 	return &[6]float64{minX, minY, minZ, maxX, maxY, maxZ}
 }
 
+type BaseMesh struct {
+	Materials []MeshMaterial `json:"materials,omitempty"`
+	Nodes     []*MeshNode    `json:"nodes,omitempty"`
+}
+
 type Mesh struct {
-	Version      uint32         `json:"version"`
-	Materials    []MeshMaterial `json:"materials,omitempty"`
-	Nodes        []*MeshNode    `json:"nodes,omitempty"`
+	BaseMesh
+	Version      uint32 `json:"version"`
 	InstanceNode []*InstanceMst
 }
 
@@ -664,9 +668,13 @@ func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 func MeshMarshal(wt io.Writer, ms *Mesh) {
 	wt.Write([]byte(MESH_SIGNATURE))
 	writeLittleByte(wt, ms.Version)
+	baseMeshMarshal(wt, &ms.BaseMesh)
+	MeshInstanceNodesMarshal(wt, ms.InstanceNode)
+}
+
+func baseMeshMarshal(wt io.Writer, ms *BaseMesh) {
 	MtlsMarshal(wt, ms.Materials)
 	MeshNodesMarshal(wt, ms.Nodes)
-	MeshInstanceNodesMarshal(wt, ms.InstanceNode)
 }
 
 func MeshUnMarshal(rd io.Reader) *Mesh {
@@ -674,10 +682,16 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	sig := make([]byte, 4)
 	rd.Read(sig)
 	readLittleByte(rd, &ms.Version)
-	ms.Materials = MtlsUnMarshal(rd)
-	ms.Nodes = MeshNodesUnMarshal(rd)
+	ms.BaseMesh = *baseMeshUnMarshal(rd)
 	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd)
 	return &ms
+}
+
+func baseMeshUnMarshal(rd io.Reader) *BaseMesh {
+	ms := &BaseMesh{}
+	ms.Materials = MtlsUnMarshal(rd)
+	ms.Nodes = MeshNodesUnMarshal(rd)
+	return ms
 }
 
 func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMst) {
@@ -696,7 +710,7 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
 		writeLittleByte(wt, mt[3][:])
 	}
 	writeLittleByte(wt, instNd.BBox)
-	MeshMarshal(wt, instNd.Mesh)
+	baseMeshMarshal(wt, instNd.Mesh)
 }
 
 func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMst {
@@ -724,7 +738,7 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
 	}
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
-	inst.Mesh = MeshUnMarshal(rd)
+	inst.Mesh = baseMeshUnMarshal(rd)
 	return inst
 }
 

@@ -85,9 +85,35 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 }
 
 func BuildGltf(doc *gltf.Document, mh *Mesh) error {
+	err := buildGltf(doc, &mh.BaseMesh)
+	if err != nil {
+		return err
+	}
+	meshCount := len(doc.Meshes)
+	for _, inst := range mh.InstanceNode {
+		meshId := uint32(meshCount)
+		buildGltf(doc, inst.Mesh)
+		for _, mt := range inst.Transfors {
+			ay := *mt.Array()
+			nd := gltf.Node{
+				Mesh: &meshId,
+				Matrix: [16]float32{
+					float32(ay[0]), float32(ay[1]), float32(ay[2]), float32(ay[3]),
+					float32(ay[4]), float32(ay[5]), float32(ay[6]), float32(ay[7]),
+					float32(ay[8]), float32(ay[9]), float32(ay[10]), float32(ay[11]),
+					float32(ay[12]), float32(ay[13]), float32(ay[14]), float32(ay[15]),
+				},
+			}
+			doc.Nodes = append(doc.Nodes, &nd)
+		}
+	}
+
+	return nil
+}
+
+func buildGltf(doc *gltf.Document, mh *BaseMesh) error {
 	mtlMap := make(map[uint32]uint32)
 	var prewCreateMtlCount uint32 = 0
-	meshCount := len(doc.Meshes)
 	buffer := doc.Buffers[0]
 
 	for _, nd := range mh.Nodes {
@@ -221,23 +247,8 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		}
 		doc.Meshes = append(doc.Meshes, mesh)
 	}
-	for _, inst := range mh.InstanceNode {
-		meshId := inst.MeshNodeId + uint32(meshCount)
-		for _, mt := range inst.Transfors {
-			ay := *mt.Array()
-			nd := gltf.Node{
-				Mesh: &meshId,
-				Matrix: [16]float32{
-					float32(ay[0]), float32(ay[1]), float32(ay[2]), float32(ay[3]),
-					float32(ay[4]), float32(ay[5]), float32(ay[6]), float32(ay[7]),
-					float32(ay[8]), float32(ay[9]), float32(ay[10]), float32(ay[11]),
-					float32(ay[12]), float32(ay[13]), float32(ay[14]), float32(ay[15]),
-				},
-			}
-			doc.Nodes = append(doc.Nodes, &nd)
-		}
-	}
-	e := fillMaterials(doc, mh)
+
+	e := fillMaterials(doc, mh.Materials)
 
 	if e != nil {
 		return e
@@ -245,11 +256,11 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 	return nil
 }
 
-func fillMaterials(doc *gltf.Document, mesh *Mesh) error {
+func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 	texMap := make(map[int32]uint32)
 	buffer := doc.Buffers[0]
-	for i := range mesh.Materials {
-		mtl := mesh.Materials[i]
+	for i := range mts {
+		mtl := mts[i]
 
 		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.AlphaMask}
 		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{BaseColorFactor: &[4]float32{1, 1, 1, 1}}
