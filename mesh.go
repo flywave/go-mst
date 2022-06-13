@@ -244,8 +244,9 @@ func triangleArea(a, b *vec3.T) float64 {
 	return 0.5 * math.Sqrt(i+j+k)
 }
 
-type InstanceMst struct {
+type InstanceMesh struct {
 	Transfors []*dmat.T
+	Features  []uint32
 	BBox      *[6]float64
 	Mesh      *BaseMesh
 }
@@ -277,7 +278,7 @@ type BaseMesh struct {
 type Mesh struct {
 	BaseMesh
 	Version      uint32 `json:"version"`
-	InstanceNode []*InstanceMst
+	InstanceNode []*InstanceMesh
 }
 
 func NewMesh() *Mesh {
@@ -694,14 +695,14 @@ func baseMeshUnMarshal(rd io.Reader) *BaseMesh {
 	return ms
 }
 
-func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMst) {
+func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
 	writeLittleByte(wt, uint32(len(instNd)))
 	for _, nd := range instNd {
 		MeshInstanceNodeMarshal(wt, nd)
 	}
 }
 
-func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
+func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	writeLittleByte(wt, len(instNd.Transfors))
 	for _, mt := range instNd.Transfors {
 		writeLittleByte(wt, mt[0][:])
@@ -709,22 +710,26 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
 		writeLittleByte(wt, mt[2][:])
 		writeLittleByte(wt, mt[3][:])
 	}
+	writeLittleByte(wt, len(instNd.Features))
+	for _, f := range instNd.Features {
+		writeLittleByte(wt, f)
+	}
 	writeLittleByte(wt, instNd.BBox)
 	baseMeshMarshal(wt, instNd.Mesh)
 }
 
-func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMst {
+func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMesh {
 	var size uint32
 	readLittleByte(rd, &size)
-	nds := make([]*InstanceMst, size)
+	nds := make([]*InstanceMesh, size)
 	for i := range nds {
 		nds[i] = MeshInstanceNodeUnMarshal(rd)
 	}
 	return nds
 }
 
-func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
-	inst := &InstanceMst{}
+func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
+	inst := &InstanceMesh{}
 	var size uint32
 	readLittleByte(rd, &size)
 	mats := make([]*dmat.T, size)
@@ -735,6 +740,12 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
 		readLittleByte(rd, mt[2][:])
 		readLittleByte(rd, mt[3][:])
 		mats[i] = mt
+	}
+	var fsize uint32
+	readLittleByte(rd, &fsize)
+	inst.Features = make([]uint32, fsize)
+	for i := range inst.Features {
+		readLittleByte(rd, &inst.Features[i])
 	}
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
