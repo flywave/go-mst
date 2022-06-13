@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
+	"github.com/mitchellh/hashstructure/v2"
+
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 	"golang.org/x/image/bmp"
@@ -249,6 +251,7 @@ type InstanceMesh struct {
 	Features  []uint32
 	BBox      *[6]float64
 	Mesh      *BaseMesh
+	Hash      uint64
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -702,6 +705,17 @@ func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
 	}
 }
 
+func rehashMesh(mesh *BaseMesh) uint64 {
+	if mesh == nil {
+		return 0
+	}
+	h, err := hashstructure.Hash(mesh, hashstructure.FormatV2, nil)
+	if err != nil {
+		return 0
+	}
+	return h
+}
+
 func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	writeLittleByte(wt, len(instNd.Transfors))
 	for _, mt := range instNd.Transfors {
@@ -716,6 +730,11 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	}
 	writeLittleByte(wt, instNd.BBox)
 	baseMeshMarshal(wt, instNd.Mesh)
+	hash := rehashMesh(instNd.Mesh)
+	if instNd.Hash != hash {
+		instNd.Hash = hash
+	}
+	writeLittleByte(wt, instNd.Hash)
 }
 
 func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMesh {
@@ -750,6 +769,7 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
 	inst.Mesh = baseMeshUnMarshal(rd)
+	readLittleByte(rd, &inst.Hash)
 	return inst
 }
 
@@ -836,10 +856,10 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 
 func CreateTexture(name string, repet bool) (*Texture, error) {
 	file, err := os.Open(name)
-	defer file.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 	buf, err := ioutil.ReadAll(file)
 	if err != nil {
 		return nil, err
