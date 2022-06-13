@@ -245,9 +245,9 @@ func triangleArea(a, b *vec3.T) float64 {
 }
 
 type InstanceMst struct {
-	Transfors  []*dmat.T
-	MeshNodeId uint32
-	BBox       *[6]float64
+	Transfors []*dmat.T
+	BBox      *[6]float64
+	Mesh      *Mesh
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -695,8 +695,8 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
 		writeLittleByte(wt, mt[2][:])
 		writeLittleByte(wt, mt[3][:])
 	}
-	writeLittleByte(wt, instNd.MeshNodeId)
 	writeLittleByte(wt, instNd.BBox)
+	MeshMarshal(wt, instNd.Mesh)
 }
 
 func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMst {
@@ -722,10 +722,9 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
 		readLittleByte(rd, mt[3][:])
 		mats[i] = mt
 	}
-	readLittleByte(rd, &size)
-	inst.MeshNodeId = size
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
+	inst.Mesh = MeshUnMarshal(rd)
 	return inst
 }
 
