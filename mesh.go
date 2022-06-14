@@ -723,14 +723,14 @@ func HashMesh(mesh *BaseMesh) uint64 {
 }
 
 func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
-	writeLittleByte(wt, len(instNd.Transfors))
+	writeLittleByte(wt, uint32(len(instNd.Transfors)))
 	for _, mt := range instNd.Transfors {
 		writeLittleByte(wt, mt[0][:])
 		writeLittleByte(wt, mt[1][:])
 		writeLittleByte(wt, mt[2][:])
 		writeLittleByte(wt, mt[3][:])
 	}
-	writeLittleByte(wt, len(instNd.Features))
+	writeLittleByte(wt, uint32(len(instNd.Features)))
 	for _, f := range instNd.Features {
 		writeLittleByte(wt, f)
 	}
@@ -757,14 +757,14 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
 	inst := &InstanceMesh{}
 	var size uint32
 	readLittleByte(rd, &size)
-	mats := make([]*dmat.T, size)
-	for i := range mats {
+	inst.Transfors = make([]*dmat.T, size)
+	for i := range inst.Transfors {
 		mt := &dmat.T{}
-		readLittleByte(rd, mt[0][:])
-		readLittleByte(rd, mt[1][:])
-		readLittleByte(rd, mt[2][:])
-		readLittleByte(rd, mt[3][:])
-		mats[i] = mt
+		readLittleByte(rd, &mt[0])
+		readLittleByte(rd, &mt[1])
+		readLittleByte(rd, &mt[2])
+		readLittleByte(rd, &mt[3])
+		inst.Transfors[i] = mt
 	}
 	var fsize uint32
 	readLittleByte(rd, &fsize)
