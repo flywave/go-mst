@@ -275,9 +275,9 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.PBRMetallicRoughness.MetallicFactor = &mc
 			rs := float32(ml.Roughness)
 			gm.PBRMetallicRoughness.RoughnessFactor = &rs
-			gm.EmissiveFactor[0] = float32(ml.Emissive[0])
-			gm.EmissiveFactor[1] = float32(ml.Emissive[1])
-			gm.EmissiveFactor[2] = float32(ml.Emissive[2])
+			gm.EmissiveFactor[0] = float32(ml.Emissive[0]) / 255
+			gm.EmissiveFactor[1] = float32(ml.Emissive[1]) / 255
+			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 			texMtl = &ml.TextureMaterial
 		case *LambertMaterial:
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
