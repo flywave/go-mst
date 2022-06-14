@@ -715,7 +715,9 @@ func HashMesh(mesh *BaseMesh) uint64 {
 
 		h, err := hashstructure.Hash(n.Vertices, hashstructure.FormatV2, nil)
 
-		hash = hash ^ h
+		if err != nil {
+			hash = hash ^ h
+		}
 	}
 	return hash
 }
