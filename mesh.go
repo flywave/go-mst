@@ -705,15 +705,19 @@ func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
 	}
 }
 
-func rehashMesh(mesh *BaseMesh) uint64 {
+func HashMesh(mesh *BaseMesh) uint64 {
 	if mesh == nil {
 		return 0
 	}
-	h, err := hashstructure.Hash(mesh, hashstructure.FormatV2, nil)
-	if err != nil {
-		return 0
+	hash := uint64(0)
+	for i := range mesh.Nodes {
+		n := mesh.Nodes[i]
+
+		h, err := hashstructure.Hash(n.Vertices, hashstructure.FormatV2, nil)
+
+		hash = hash ^ h
 	}
-	return h
+	return hash
 }
 
 func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
@@ -730,7 +734,7 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	}
 	writeLittleByte(wt, instNd.BBox)
 	baseMeshMarshal(wt, instNd.Mesh)
-	hash := rehashMesh(instNd.Mesh)
+	hash := HashMesh(instNd.Mesh)
 	if instNd.Hash != hash {
 		instNd.Hash = hash
 	}
