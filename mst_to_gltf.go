@@ -325,11 +325,11 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			doc.Images = append(doc.Images, gimg)
 
 			var sp *gltf.Sampler
-			// if texMtl.Texture.Repeated {
-			sp = &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
-			// } else {
-			// 	sp = &gltf.Sampler{WrapS: gltf.ClampToEdge, WrapT: gltf.ClampToEdge}
-			// }
+			if texMtl.Texture.Repeated {
+				sp = &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
+			} else {
+				sp = &gltf.Sampler{WrapS: gltf.WrapClampToEdge, WrapT: gltf.WrapClampToEdge}
+			}
 			doc.Samplers = append(doc.Samplers, sp)
 
 			texIndex := uint32(len(doc.Textures))

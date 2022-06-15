@@ -52,7 +52,7 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf3(t *testing.T) {
-	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_ws_szk.mst")
+	f, _ := os.Open("/tmp/2426425825/0dd5ff57833fb26486e3482642f3464a.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
 	BuildGltf(doc, mh)
