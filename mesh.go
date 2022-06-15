@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
+	"github.com/mitchellh/hashstructure/v2"
+
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 	"golang.org/x/image/bmp"
@@ -244,10 +246,12 @@ func triangleArea(a, b *vec3.T) float64 {
 	return 0.5 * math.Sqrt(i+j+k)
 }
 
-type InstanceMst struct {
+type InstanceMesh struct {
 	Transfors []*dmat.T
+	Features  []uint32
 	BBox      *[6]float64
 	Mesh      *BaseMesh
+	Hash      uint64
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -277,7 +281,7 @@ type BaseMesh struct {
 type Mesh struct {
 	BaseMesh
 	Version      uint32 `json:"version"`
-	InstanceNode []*InstanceMst
+	InstanceNode []*InstanceMesh
 }
 
 func NewMesh() *Mesh {
@@ -694,51 +698,84 @@ func baseMeshUnMarshal(rd io.Reader) *BaseMesh {
 	return ms
 }
 
-func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMst) {
+func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
 	writeLittleByte(wt, uint32(len(instNd)))
 	for _, nd := range instNd {
 		MeshInstanceNodeMarshal(wt, nd)
 	}
 }
 
-func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMst) {
-	writeLittleByte(wt, len(instNd.Transfors))
+func HashMesh(mesh *BaseMesh) uint64 {
+	if mesh == nil {
+		return 0
+	}
+	hash := uint64(0)
+	for i := range mesh.Nodes {
+		n := mesh.Nodes[i]
+
+		h, err := hashstructure.Hash(n.Vertices, hashstructure.FormatV2, nil)
+
+		if err != nil {
+			hash = hash ^ h
+		}
+	}
+	return hash
+}
+
+func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
+	writeLittleByte(wt, uint32(len(instNd.Transfors)))
 	for _, mt := range instNd.Transfors {
 		writeLittleByte(wt, mt[0][:])
 		writeLittleByte(wt, mt[1][:])
 		writeLittleByte(wt, mt[2][:])
 		writeLittleByte(wt, mt[3][:])
 	}
+	writeLittleByte(wt, uint32(len(instNd.Features)))
+	for _, f := range instNd.Features {
+		writeLittleByte(wt, f)
+	}
 	writeLittleByte(wt, instNd.BBox)
 	baseMeshMarshal(wt, instNd.Mesh)
+	hash := HashMesh(instNd.Mesh)
+	if instNd.Hash != hash {
+		instNd.Hash = hash
+	}
+	writeLittleByte(wt, instNd.Hash)
 }
 
-func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMst {
+func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMesh {
 	var size uint32
 	readLittleByte(rd, &size)
-	nds := make([]*InstanceMst, size)
+	nds := make([]*InstanceMesh, size)
 	for i := range nds {
 		nds[i] = MeshInstanceNodeUnMarshal(rd)
 	}
 	return nds
 }
 
-func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMst {
-	inst := &InstanceMst{}
+func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
+	inst := &InstanceMesh{}
 	var size uint32
 	readLittleByte(rd, &size)
-	mats := make([]*dmat.T, size)
-	for i := range mats {
+	inst.Transfors = make([]*dmat.T, size)
+	for i := range inst.Transfors {
 		mt := &dmat.T{}
-		readLittleByte(rd, mt[0][:])
-		readLittleByte(rd, mt[1][:])
-		readLittleByte(rd, mt[2][:])
-		readLittleByte(rd, mt[3][:])
-		mats[i] = mt
+		readLittleByte(rd, &mt[0])
+		readLittleByte(rd, &mt[1])
+		readLittleByte(rd, &mt[2])
+		readLittleByte(rd, &mt[3])
+		inst.Transfors[i] = mt
+	}
+	var fsize uint32
+	readLittleByte(rd, &fsize)
+	inst.Features = make([]uint32, fsize)
+	for i := range inst.Features {
+		readLittleByte(rd, &inst.Features[i])
 	}
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
 	inst.Mesh = baseMeshUnMarshal(rd)
+	readLittleByte(rd, &inst.Hash)
 	return inst
 }
 
@@ -825,10 +862,10 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 
 func CreateTexture(name string, repet bool) (*Texture, error) {
 	file, err := os.Open(name)
-	defer file.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 	buf, err := ioutil.ReadAll(file)
 	if err != nil {
 		return nil, err
