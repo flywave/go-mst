@@ -6,6 +6,8 @@ import (
 	"image/png"
 	"io"
 
+	mat4d "github.com/flywave/go3d/float64/mat4"
+
 	"github.com/qmuntal/gltf"
 )
 
@@ -94,15 +96,12 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 		meshId := uint32(meshCount)
 		buildGltf(doc, inst.Mesh)
 		for _, mt := range inst.Transfors {
-			ay := *mt.Array()
+			position, quat, scale := mat4d.Decompose(mt)
 			nd := gltf.Node{
-				Mesh: &meshId,
-				Matrix: [16]float32{
-					float32(ay[0]), float32(ay[1]), float32(ay[2]), float32(ay[3]),
-					float32(ay[4]), float32(ay[5]), float32(ay[6]), float32(ay[7]),
-					float32(ay[8]), float32(ay[9]), float32(ay[10]), float32(ay[11]),
-					float32(ay[12]), float32(ay[13]), float32(ay[14]), float32(ay[15]),
-				},
+				Mesh:        &meshId,
+				Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
+				Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
+				Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
 			}
 			doc.Nodes = append(doc.Nodes, &nd)
 		}
