@@ -87,14 +87,13 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 }
 
 func BuildGltf(doc *gltf.Document, mh *Mesh) error {
-	err := buildGltf(doc, &mh.BaseMesh)
+	err := buildGltf(doc, &mh.BaseMesh, true)
 	if err != nil {
 		return err
 	}
-	meshCount := len(doc.Meshes)
 	for _, inst := range mh.InstanceNode {
-		meshId := uint32(meshCount)
-		buildGltf(doc, inst.Mesh)
+		meshId := uint32(len(doc.Meshes))
+		buildGltf(doc, inst.Mesh, false)
 		for _, mt := range inst.Transfors {
 			position, quat, scale := mat4d.Decompose(mt)
 			nd := gltf.Node{
@@ -104,13 +103,14 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 				Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
 			}
 			doc.Nodes = append(doc.Nodes, &nd)
+			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
 		}
 	}
 
 	return nil
 }
 
-func buildGltf(doc *gltf.Document, mh *BaseMesh) error {
+func buildGltf(doc *gltf.Document, mh *BaseMesh, addnode bool) error {
 	mtlMap := make(map[uint32]uint32)
 	var prewCreateMtlCount uint32 = 0
 	buffer := doc.Buffers[0]
@@ -162,11 +162,13 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh) error {
 		buffer.Data = append(buffer.Data, buf.Bytes()...)
 
 		mesh := &gltf.Mesh{}
-		doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
-		nde := &gltf.Node{}
-		l := (uint32)(len(doc.Meshes))
-		nde.Mesh = &l
-		doc.Nodes = append(doc.Nodes, nde)
+		if addnode {
+			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
+			nde := &gltf.Node{}
+			l := (uint32)(len(doc.Meshes))
+			nde.Mesh = &l
+			doc.Nodes = append(doc.Nodes, nde)
+		}
 
 		aftIndices := uint32(len(nd.FaceGroup))
 		idx := uint32(len(doc.Accessors))
