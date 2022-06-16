@@ -111,8 +111,7 @@ func BuildGltf(doc *gltf.Document, mh *Mesh) error {
 }
 
 func buildGltf(doc *gltf.Document, mh *BaseMesh, addnode bool) error {
-	mtlMap := make(map[uint32]uint32)
-	var prewCreateMtlCount uint32 = 0
+	prewCreateMtlCount := uint32(len(doc.Materials))
 	buffer := doc.Buffers[0]
 
 	for _, nd := range mh.Nodes {
@@ -177,14 +176,8 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh, addnode bool) error {
 		for i := range nd.FaceGroup {
 			tmp := indexPos
 			patch := nd.FaceGroup[i]
-			var mtl_id uint32
-			if m, ok := mtlMap[uint32(patch.Batchid)]; ok {
-				mtl_id = m
-			} else {
-				mtl_id = uint32(len(doc.Materials)) + prewCreateMtlCount
-				prewCreateMtlCount++
-				mtlMap[uint32(patch.Batchid)] = mtl_id
-			}
+			mtl_id := uint32(len(doc.Materials)) + prewCreateMtlCount
+
 			ps := &gltf.Primitive{}
 			ps.Material = &mtl_id
 			if ps.Attributes == nil {
@@ -250,10 +243,10 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh, addnode bool) error {
 	}
 
 	e := fillMaterials(doc, mh.Materials)
-
 	if e != nil {
 		return e
 	}
+
 	return nil
 }
 
