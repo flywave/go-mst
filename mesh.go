@@ -19,7 +19,6 @@ import (
 	"strings"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
-	"github.com/mitchellh/hashstructure/v2"
 
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
@@ -705,23 +704,6 @@ func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
 	}
 }
 
-func HashMesh(mesh *BaseMesh) uint64 {
-	if mesh == nil {
-		return 0
-	}
-	hash := uint64(0)
-	for i := range mesh.Nodes {
-		n := mesh.Nodes[i]
-
-		h, err := hashstructure.Hash(n.Vertices, hashstructure.FormatV2, nil)
-
-		if err != nil {
-			hash = hash ^ h
-		}
-	}
-	return hash
-}
-
 func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	writeLittleByte(wt, uint32(len(instNd.Transfors)))
 	for _, mt := range instNd.Transfors {
@@ -736,10 +718,6 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	}
 	writeLittleByte(wt, instNd.BBox)
 	baseMeshMarshal(wt, instNd.Mesh)
-	hash := HashMesh(instNd.Mesh)
-	if instNd.Hash != hash {
-		instNd.Hash = hash
-	}
 	writeLittleByte(wt, instNd.Hash)
 }
 
