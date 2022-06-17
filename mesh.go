@@ -28,6 +28,7 @@ import (
 
 const MESH_SIGNATURE string = "fwtm"
 const MSTEXT string = ".mst"
+const V1 uint32 = 1
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0
@@ -284,7 +285,7 @@ type Mesh struct {
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: 1}
+	return &Mesh{Version: V1}
 }
 
 func (m *Mesh) NodeCount() int {
