@@ -176,7 +176,7 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh, addnode bool) error {
 		for i := range nd.FaceGroup {
 			tmp := indexPos
 			patch := nd.FaceGroup[i]
-			mtl_id := uint32(len(doc.Materials)) + prewCreateMtlCount
+			mtl_id := uint32(patch.Batchid) + prewCreateMtlCount
 
 			ps := &gltf.Primitive{}
 			ps.Material = &mtl_id
