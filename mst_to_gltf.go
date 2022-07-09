@@ -200,8 +200,6 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh, addnode bool) error {
 				ps.Attributes["NORMAL"] = tmp
 			}
 			ps.Mode = gltf.PrimitiveTriangles
-			mtlId := uint32(batchId) + uint32(len(doc.Materials))
-			ps.Material = &mtlId
 			mesh.Primitives = append(mesh.Primitives, ps)
 
 			indexacc := &gltf.Accessor{}
