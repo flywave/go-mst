@@ -40,7 +40,7 @@ func TestToMst(t *testing.T) {
 			// mh := MeshUnMarshal(f)
 			// f.Close()
 			doc := CreateDoc()
-			BuildGltf(doc, mh)
+			BuildGltf(doc, mh, false)
 			bt, _ := GetGltfBinary(doc, 8)
 			ioutil.WriteFile(glbPh, bt, os.ModePerm)
 
@@ -56,7 +56,7 @@ func TestGltf3(t *testing.T) {
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
-	BuildGltf(doc, mh)
+	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("/home/hj/snap/dukto/16/model_hill_0.mst_exchange.glb", bt, os.ModePerm)
 }
@@ -64,7 +64,7 @@ func TestGltf3(t *testing.T) {
 func TestGltf(t *testing.T) {
 	mesh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/HHRQQiTiWoLunLiuLiangJi/HHRQQiTiWoLunLiuLiangJi.json")
 	doc := CreateDoc()
-	BuildGltf(doc, mesh)
+	BuildGltf(doc, mesh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/public/HHRQQiTiWoLunLiuLiangJi/HHRQQiTiWoLunLiuLiangJi.glb", bt, os.ModePerm)
 }
@@ -73,7 +73,7 @@ func TestGltf2(t *testing.T) {
 	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
 
 	doc := CreateDoc()
-	BuildGltf(doc, mh)
+	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.glb", bt, os.ModePerm)
 }
@@ -81,7 +81,7 @@ func TestGltf2(t *testing.T) {
 func TestBin2(t *testing.T) {
 	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.json")
 	doc := CreateDoc()
-	BuildGltf(doc, mh)
+	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.glb", bt, os.ModePerm)
 
