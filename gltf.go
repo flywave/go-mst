@@ -420,6 +420,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 
 		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.AlphaMask}
 		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{BaseColorFactor: &[4]float32{1, 1, 1, 1}}
+		gm.Extensions = make(map[string]interface{})
 		var texMtl *TextureMaterial
 		var cl *[4]float32
 		switch ml := mtl.(type) {
