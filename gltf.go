@@ -449,6 +449,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
 			gm.Extensions[specular.ExtensionName] = spmtl
+			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
 		case *PhongMaterial:
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
@@ -464,6 +465,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
 			gm.Extensions[specular.ExtensionName] = spmtl
+			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
 		case *TextureMaterial:
 			texMtl = ml
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
