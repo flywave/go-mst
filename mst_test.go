@@ -35,10 +35,13 @@ func TestToMst(t *testing.T) {
 			// 		continue
 			// 	}
 			// }
-			mh, _ := ThreejsBin2Mst(fpath)
-			// f, _ := os.Open(mstPh)
-			// mh := MeshUnMarshal(f)
-			// f.Close()
+			// mh, _ := ThreejsBin2Mst(fpath)
+			f, _ := os.Open(mstPh)
+			mh := MeshUnMarshal(f)
+			f.Close()
+			for _, nd := range mh.Nodes {
+				nd.ReComputeNormal()
+			}
 			doc := CreateDoc()
 			BuildGltf(doc, mh, false)
 			bt, _ := GetGltfBinary(doc, 8)

@@ -224,11 +224,11 @@ func (n *MeshNode) ReComputeNormal() {
 			n1.Add(weightedNormal)
 			n1.Normalize()
 
-			n2 := &normals[f.Vertex[0]]
+			n2 := &normals[f.Vertex[1]]
 			n2.Add(weightedNormal)
 			n2.Normalize()
 
-			n3 := &normals[f.Vertex[0]]
+			n3 := &normals[f.Vertex[2]]
 			n3.Add(weightedNormal)
 			n3.Normalize()
 		}
