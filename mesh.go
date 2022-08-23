@@ -209,17 +209,16 @@ func (n *MeshNode) ReComputeNormal() {
 			pt2 := n.Vertices[f.Vertex[1]]
 			pt3 := n.Vertices[f.Vertex[2]]
 
-			sub1 := vec3.Sub(&pt2, &pt1)
-			sub1.Normalize()
-			sub2 := vec3.Sub(&pt3, &pt1)
-			sub2.Normalize()
+			sub1 := vec3.Sub(&pt3, &pt2)
+			sub2 := vec3.Sub(&pt1, &pt2)
 
 			cro := vec3.Cross(&sub1, &sub2)
-			cro.Normalize()
-
-			areaPerFace := triangleArea(&pt1, &pt2)
-
-			weightedNormal := cro.Scale(float32(areaPerFace))
+			l := cro.Length()
+			f.Normal = &f.Vertex
+			if l == 0 {
+				continue
+			}
+			weightedNormal := cro.Scale(1 / l)
 
 			n1 := &normals[f.Vertex[0]]
 			n1.Add(weightedNormal)
@@ -232,18 +231,9 @@ func (n *MeshNode) ReComputeNormal() {
 			n3 := &normals[f.Vertex[0]]
 			n3.Add(weightedNormal)
 			n3.Normalize()
-
-			f.Normal = &f.Vertex
 		}
 	}
 	n.Normals = normals
-}
-
-func triangleArea(a, b *vec3.T) float64 {
-	i := math.Pow(float64(a[1]*b[2]-a[2]*b[1]), 2)
-	j := math.Pow(float64(a[2]*b[0]-a[0]*b[2]), 2)
-	k := math.Pow(float64(a[0]*b[1]-a[1]*b[0]), 2)
-	return 0.5 * math.Sqrt(i+j+k)
 }
 
 type InstanceMesh struct {
