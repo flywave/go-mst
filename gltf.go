@@ -471,7 +471,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 		}
 
-		if texMtl.HasTexture() {
+		if texMtl != nil && texMtl.HasTexture() {
 			if idx, ok := texMap[texMtl.Texture.Id]; ok {
 				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: idx}
 			} else {
