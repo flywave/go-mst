@@ -122,11 +122,12 @@ func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline bool) error {
 }
 
 type buildContext struct {
-	mtlSize uint32
-	bvIndex uint32
-	bvPos   uint32
-	bvTex   uint32
-	bvNorm  uint32
+	mtlSize       uint32
+	bvIndex       uint32
+	bvPos         uint32
+	bvTex         uint32
+	bvNorm        uint32
+	indexAccStart uint32
 }
 
 func buildMeshBuffer(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, nd *MeshNode) []*gltf.BufferView {
@@ -265,7 +266,6 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	aftIndices := uint32(len(nd.FaceGroup))
 	idx := uint32(len(accessors))
 	indexPos := aftIndices + idx
-	var start uint32 = 0
 	for i := range nd.FaceGroup {
 		tmp := indexPos
 		patch := nd.FaceGroup[i]
@@ -298,9 +298,7 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 		indexacc := &gltf.Accessor{}
 		indexacc.ComponentType = gltf.ComponentUint
 
-		indexacc.ByteOffset = start * 12
 		indexacc.Count = uint32(len(patch.Faces)) * 3
-		start += uint32(len(patch.Faces))
 		bfindex := ctx.bvIndex
 		indexacc.BufferView = &bfindex
 		accessors = append(accessors, indexacc)
@@ -311,7 +309,8 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	posacc.Type = gltf.AccessorVec3
 	posacc.Count = uint32(len(nd.Vertices))
 
-	posacc.BufferView = &ctx.bvPos
+	bvPos := ctx.bvPos
+	posacc.BufferView = &bvPos
 	box := nd.GetBoundbox()
 	posacc.Min = []float32{float32(box[0]), float32(box[1]), float32(box[2])}
 	posacc.Max = []float32{float32(box[3]), float32(box[4]), float32(box[5])}
@@ -322,7 +321,8 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 		texacc.ComponentType = gltf.ComponentFloat
 		texacc.Type = gltf.AccessorVec2
 		texacc.Count = uint32(len(nd.TexCoords))
-		texacc.BufferView = &ctx.bvTex
+		bvTex := ctx.bvTex
+		texacc.BufferView = &bvTex
 		accessors = append(accessors, texacc)
 	}
 
@@ -331,7 +331,8 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 		nlacc.ComponentType = gltf.ComponentFloat
 		nlacc.Type = gltf.AccessorVec3
 		nlacc.Count = uint32(len(nd.Normals))
-		nlacc.BufferView = &ctx.bvNorm
+		bvNorm := ctx.bvNorm
+		nlacc.BufferView = &bvNorm
 		accessors = append(accessors, nlacc)
 	}
 	return mesh, accessors

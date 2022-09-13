@@ -254,3 +254,13 @@ func TestPipe(t *testing.T) {
 		MstToObj(lines2[i], fmt.Sprintf("%d", i))
 	}
 }
+
+func TestMst2Gltf(t *testing.T) {
+	f, _ := os.Open("tests/decal.mst")
+	mh := MeshUnMarshal(f)
+	mh.InstanceNode = nil
+	doc := CreateDoc()
+	BuildGltf(doc, mh, false)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("tests/decal.glb", bt, os.ModePerm)
+}
