@@ -869,7 +869,7 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 		for x := 0; x < bd.Dx(); x++ {
 			cl := img.At(x, y)
 			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			buf1 = append(buf1, byte(r), byte(g), byte(b), byte(a))
+			buf1 = append(buf1, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(a&0xff))
 		}
 	}
 
