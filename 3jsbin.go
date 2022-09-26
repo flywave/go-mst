@@ -33,13 +33,14 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+
+	mesh := NewMesh()
+	nd := &MeshNode{}
+
 	binpath, _ := filepath.Split(fpath)
 	binpath = filepath.Join(binpath, jsobj.BinBuffer)
 	bf, _ := os.Open(binpath)
 	binobj, _ := jsbin.Decode(bf)
-
-	mesh := NewMesh()
-	nd := &MeshNode{}
 
 	var sc float32 = 1
 	rot := jsobj.Topology.Rotation
@@ -215,7 +216,7 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 	}
 
 	for id, mtl := range jsobj.Materials {
-		ml := &PbrMaterial{}
+		ml := &PbrMaterial{Roughness: 1, Metallic: 0}
 		if len(mtl.ColorDiffuse) != 0 {
 			ml.Color[0] = byte(mtl.ColorDiffuse[0] * 255.0)
 			ml.Color[1] = byte(mtl.ColorDiffuse[1] * 255.0)
@@ -228,13 +229,20 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 
 		if mtl.MapDiffuse != "" {
 			dir, _ := filepath.Split(fpath)
-			tex, err := convertTex(filepath.Join(dir, mtl.MapDiffuse), id)
+			var ap *string
+			if mtl.MapAlpha != "" {
+				ph := filepath.Join(dir, mtl.MapAlpha)
+				ap = &ph
+			}
+			tex, err := convertTex(filepath.Join(dir, mtl.MapDiffuse), ap, id)
 			if err == nil {
 				ml.Texture = tex
 			}
 		}
+
 		mesh.Materials = append(mesh.Materials, ml)
 	}
+
 	nd.ResortVtVn()
 	// nd.ReComputeNormal()
 	mesh.Nodes = append(mesh.Nodes, nd)
@@ -274,27 +282,31 @@ func readDir(root, path string, ext_filter []string) ([]string, error) {
 	return res, nil
 }
 
-func convertTex(path string, texId int) (*Texture, error) {
-	f, err := os.Open(path)
+func convertTex(path string, alphPh *string, texId int) (*Texture, error) {
+	img1, err := readImageByPath(path)
 	if err != nil {
 		return nil, err
 	}
-	_, ft, err := image.Decode(f)
+	var img2 image.Image
+	if alphPh != nil {
+		img2, err = readImageByPath(*alphPh)
+	}
 	if err != nil {
 		return nil, err
 	}
-	f.Seek(0, 0)
-	img, err := readImage(f, ft)
-	if err != nil {
-		return nil, err
-	}
-	bd := img.Bounds()
+	bd := img1.Bounds()
 	buf := []byte{}
 	for y := 0; y < bd.Dy(); y++ {
 		for x := 0; x < bd.Dx(); x++ {
-			cl := img.At(x, y)
+			cl := img1.At(x, y)
 			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			buf = append(buf, byte(r), byte(g), byte(b), byte(a))
+			sc := float32(1)
+			if img2 != nil {
+				cl2 := img2.At(x, y)
+				r, _, _, _ := color.RGBAModel.Convert(cl2).RGBA()
+				sc = float32(r&0xff) / 255
+			}
+			buf = append(buf, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(float32(a&0xff)*sc))
 		}
 	}
 	_, name := filepath.Split(path)
@@ -306,6 +318,19 @@ func convertTex(path string, texId int) (*Texture, error) {
 	t.Compressed = TEXTURE_COMPRESSED_ZLIB
 	t.Data = CompressImage(buf)
 	return t, nil
+}
+
+func readImageByPath(path string) (image.Image, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	_, ft, err := image.Decode(f)
+	if err != nil {
+		return nil, err
+	}
+	f.Seek(0, 0)
+	return readImage(f, ft)
 }
 
 func readImage(rd io.Reader, ft string) (image.Image, error) {

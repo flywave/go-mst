@@ -35,10 +35,7 @@ func TestToMst(t *testing.T) {
 			// 		continue
 			// 	}
 			// }
-			// mh, _ := ThreejsBin2Mst(fpath)
-			f, _ := os.Open(mstPh)
-			mh := MeshUnMarshal(f)
-			f.Close()
+			mh, _ := ThreejsBin2Mst(fpath)
 			for _, nd := range mh.Nodes {
 				nd.ReComputeNormal()
 			}
