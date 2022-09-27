@@ -20,6 +20,7 @@ import (
 
 	dmat "github.com/flywave/go3d/float64/mat4"
 
+	dvec3 "github.com/flywave/go3d/float64/vec3"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 	"golang.org/x/image/bmp"
@@ -286,13 +287,13 @@ func (m *Mesh) MaterialCount() int {
 	return len(m.Materials)
 }
 
-func (m *Mesh) ComputeBBox() vec3.Box {
-	bbox := vec3.MinBox
+func (m *Mesh) ComputeBBox() dvec3.Box {
+	bbox := dvec3.MinBox
 	for _, nd := range m.Nodes {
 		bx := nd.GetBoundbox()
-		min := vec3.T{float32(bx[0]), float32(bx[1]), float32(bx[2])}
-		max := vec3.T{float32(bx[3]), float32(bx[4]), float32(bx[5])}
-		bbx := vec3.Box{Min: min, Max: max}
+		min := dvec3.T{bx[0], bx[1], bx[2]}
+		max := dvec3.T{bx[3], bx[4], bx[5]}
+		bbx := dvec3.Box{Min: min, Max: max}
 		bbox.Join(&bbx)
 	}
 	return bbox
