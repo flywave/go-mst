@@ -286,6 +286,18 @@ func (m *Mesh) MaterialCount() int {
 	return len(m.Materials)
 }
 
+func (m *Mesh) ComputeBBox() vec3.Box {
+	bbox := vec3.MinBox
+	for _, nd := range m.Nodes {
+		bx := nd.GetBoundbox()
+		min := vec3.T{float32(bx[0]), float32(bx[1]), float32(bx[2])}
+		max := vec3.T{float32(bx[3]), float32(bx[4]), float32(bx[5])}
+		bbx := vec3.Box{Min: min, Max: max}
+		bbox.Join(&bbx)
+	}
+	return bbox
+}
+
 func toLittleByteOrder(v interface{}) []byte {
 	var buf []byte
 	b := bytes.NewBuffer(buf)
