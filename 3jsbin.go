@@ -310,6 +310,9 @@ func convertTex(path string, alphPh *string, texId int) (*Texture, error) {
 		}
 	}
 	_, name := filepath.Split(path)
+	name = strings.Replace(name, ".jpg", ".png", 1)
+	name = strings.Replace(name, ".jpeg", ".png", 1)
+
 	t := &Texture{}
 	t.Id = int32(texId)
 	t.Name = name
