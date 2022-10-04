@@ -315,6 +315,10 @@ func (m *Mesh) MaterialCount() int {
 }
 
 func (m *Mesh) ComputeBBox() dvec3.Box {
+	if len(m.Nodes) == 0 {
+		return dvec3.Box{}
+	}
+
 	bbox := dvec3.MinBox
 	for _, nd := range m.Nodes {
 		bx := nd.GetBoundbox()
