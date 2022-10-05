@@ -486,10 +486,8 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: texIndex}
 				doc.Textures = append(doc.Textures, tex)
 			}
-		} else {
-			gm.PBRMetallicRoughness.BaseColorFactor = cl
 		}
-
+		gm.PBRMetallicRoughness.BaseColorFactor = cl
 		doc.Materials = append(doc.Materials, gm)
 	}
 	return nil

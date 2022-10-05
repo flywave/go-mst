@@ -16,6 +16,7 @@ import (
 	"github.com/flywave/go3d/float64/vec3"
 	fvec3 "github.com/flywave/go3d/vec3"
 	"github.com/qmuntal/gltf"
+	"github.com/xtgo/uuid"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
@@ -88,7 +89,10 @@ func TestBin2(t *testing.T) {
 }
 
 func TestPipe2(t *testing.T) {
-	MstToObj("tests/BYjishuiqi.mst", "pvc")
+	id := uuid.NewRandom().String()
+
+	id = strings.ReplaceAll(id, "-", "")
+	fmt.Println(id)
 }
 
 func TestDe(t *testing.T) {
