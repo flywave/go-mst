@@ -14,9 +14,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
 
@@ -882,23 +880,16 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 }
 
 func CreateTexture(name string, repet bool) (*Texture, error) {
-	file, err := os.Open(name)
+	reader, err := os.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	buf, err := ioutil.ReadAll(file)
+	defer reader.Close()
+	_, format, err := image.DecodeConfig(reader)
 	if err != nil {
 		return nil, err
 	}
-	format := path.Ext(name)
-	if format != "" {
-		format = format[1:]
-	} else {
-		format = "jpg"
-	}
-	format = strings.ToLower(format)
-	reader := bytes.NewBuffer([]byte(buf))
+	reader.Seek(0, io.SeekStart)
 	var img image.Image
 	switch format {
 	case "jpeg", "jpg":
