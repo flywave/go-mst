@@ -30,6 +30,7 @@ import (
 const MESH_SIGNATURE string = "fwtm"
 const MSTEXT string = ".mst"
 const V1 uint32 = 1
+const V2 uint32 = 2
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0
@@ -303,7 +304,7 @@ type Mesh struct {
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: V1}
+	return &Mesh{Version: V2}
 }
 
 func (m *Mesh) NodeCount() int {
@@ -446,11 +447,15 @@ func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial) {
 	writeLittleByte(wt, mtl.SubSurfaceColor[:])
 }
 
-func PbrMaterialUnMarshal(rd io.Reader) *PbrMaterial {
+func PbrMaterialUnMarshal(rd io.Reader, v uint32) *PbrMaterial {
 	mtl := PbrMaterial{}
 	tmtl := TextureMaterialUnMarshal(rd)
 	mtl.TextureMaterial = *tmtl
 	readLittleByte(rd, mtl.Emissive[:])
+	if v < 2 {
+		var b byte
+		readLittleByte(rd, &b)
+	}
 	readLittleByte(rd, &mtl.Metallic)
 	readLittleByte(rd, &mtl.Roughness)
 	readLittleByte(rd, &mtl.Reflectance)
@@ -521,7 +526,7 @@ func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
 	}
 }
 
-func MaterialUnMarshal(rd io.Reader) MeshMaterial {
+func MaterialUnMarshal(rd io.Reader, v uint32) MeshMaterial {
 	var ty uint32
 	readLittleByte(rd, &ty)
 	switch int(ty) {
@@ -530,7 +535,7 @@ func MaterialUnMarshal(rd io.Reader) MeshMaterial {
 	case MESH_TRIANGLE_MATERIAL_TYPE_TEXTURE:
 		return TextureMaterialUnMarshal(rd)
 	case MESH_TRIANGLE_MATERIAL_TYPE_PBR:
-		return PbrMaterialUnMarshal(rd)
+		return PbrMaterialUnMarshal(rd, v)
 	case MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT:
 		return LambertMaterialUnMarshal(rd)
 	case MESH_TRIANGLE_MATERIAL_TYPE_PHONG:
@@ -547,12 +552,12 @@ func MtlsMarshal(wt io.Writer, mtls []MeshMaterial) {
 	}
 }
 
-func MtlsUnMarshal(rd io.Reader) []MeshMaterial {
+func MtlsUnMarshal(rd io.Reader, v uint32) []MeshMaterial {
 	var size uint32
 	readLittleByte(rd, &size)
 	mtls := make([]MeshMaterial, size)
 	for i := 0; i < int(size); i++ {
-		mtls[i] = MaterialUnMarshal(rd)
+		mtls[i] = MaterialUnMarshal(rd, v)
 	}
 	return mtls
 }
@@ -720,14 +725,14 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	sig := make([]byte, 4)
 	rd.Read(sig)
 	readLittleByte(rd, &ms.Version)
-	ms.BaseMesh = *baseMeshUnMarshal(rd)
-	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd)
+	ms.BaseMesh = *baseMeshUnMarshal(rd, ms.Version)
+	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
 	return &ms
 }
 
-func baseMeshUnMarshal(rd io.Reader) *BaseMesh {
+func baseMeshUnMarshal(rd io.Reader, v uint32) *BaseMesh {
 	ms := &BaseMesh{}
-	ms.Materials = MtlsUnMarshal(rd)
+	ms.Materials = MtlsUnMarshal(rd, v)
 	ms.Nodes = MeshNodesUnMarshal(rd)
 	return ms
 }
@@ -756,17 +761,17 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 	writeLittleByte(wt, instNd.Hash)
 }
 
-func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMesh {
+func MeshInstanceNodesUnMarshal(rd io.Reader, v uint32) []*InstanceMesh {
 	var size uint32
 	readLittleByte(rd, &size)
 	nds := make([]*InstanceMesh, size)
 	for i := range nds {
-		nds[i] = MeshInstanceNodeUnMarshal(rd)
+		nds[i] = MeshInstanceNodeUnMarshal(rd, v)
 	}
 	return nds
 }
 
-func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
+func MeshInstanceNodeUnMarshal(rd io.Reader, v uint32) *InstanceMesh {
 	inst := &InstanceMesh{}
 	var size uint32
 	readLittleByte(rd, &size)
@@ -787,7 +792,7 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
 	}
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
-	inst.Mesh = baseMeshUnMarshal(rd)
+	inst.Mesh = baseMeshUnMarshal(rd, v)
 	readLittleByte(rd, &inst.Hash)
 	return inst
 }

@@ -257,7 +257,7 @@ func TestPipe(t *testing.T) {
 }
 
 func TestMst2Gltf(t *testing.T) {
-	f, _ := os.Open("tests/decal.mst")
+	f, _ := os.Open("tests/xia_exchange.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
