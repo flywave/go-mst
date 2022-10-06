@@ -429,9 +429,12 @@ func TextureMaterialUnMarshal(rd io.Reader) *TextureMaterial {
 	return &tmtl
 }
 
-func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial) {
+func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial, v uint32) {
 	TextureMaterialMarshal(wt, &mtl.TextureMaterial)
 	writeLittleByte(wt, mtl.Emissive[:])
+	if v < 2 {
+		writeLittleByte(wt, byte(255))
+	}
 	writeLittleByte(wt, &mtl.Metallic)
 	writeLittleByte(wt, &mtl.Roughness)
 	writeLittleByte(wt, &mtl.Reflectance)
@@ -506,7 +509,7 @@ func PhongMaterialUnMarshal(rd io.Reader) *PhongMaterial {
 	return &mtl
 }
 
-func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
+func MaterialMarshal(wt io.Writer, mt MeshMaterial, v uint32) {
 	switch mtl := mt.(type) {
 	case *BaseMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_COLOR))
@@ -516,7 +519,7 @@ func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
 		TextureMaterialMarshal(wt, mtl)
 	case *PbrMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PBR))
-		PbrMaterialMarshal(wt, mtl)
+		PbrMaterialMarshal(wt, mtl, v)
 	case *LambertMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT))
 		LambertMaterialMarshal(wt, mtl)
@@ -545,10 +548,10 @@ func MaterialUnMarshal(rd io.Reader, v uint32) MeshMaterial {
 	}
 }
 
-func MtlsMarshal(wt io.Writer, mtls []MeshMaterial) {
+func MtlsMarshal(wt io.Writer, mtls []MeshMaterial, v uint32) {
 	writeLittleByte(wt, uint32(len(mtls)))
 	for _, mtl := range mtls {
-		MaterialMarshal(wt, mtl)
+		MaterialMarshal(wt, mtl, v)
 	}
 }
 
@@ -711,12 +714,12 @@ func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 func MeshMarshal(wt io.Writer, ms *Mesh) {
 	wt.Write([]byte(MESH_SIGNATURE))
 	writeLittleByte(wt, ms.Version)
-	baseMeshMarshal(wt, &ms.BaseMesh)
-	MeshInstanceNodesMarshal(wt, ms.InstanceNode)
+	baseMeshMarshal(wt, &ms.BaseMesh, ms.Version)
+	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
 }
 
-func baseMeshMarshal(wt io.Writer, ms *BaseMesh) {
-	MtlsMarshal(wt, ms.Materials)
+func baseMeshMarshal(wt io.Writer, ms *BaseMesh, v uint32) {
+	MtlsMarshal(wt, ms.Materials, v)
 	MeshNodesMarshal(wt, ms.Nodes)
 }
 
@@ -737,14 +740,14 @@ func baseMeshUnMarshal(rd io.Reader, v uint32) *BaseMesh {
 	return ms
 }
 
-func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
+func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh, v uint32) {
 	writeLittleByte(wt, uint32(len(instNd)))
 	for _, nd := range instNd {
-		MeshInstanceNodeMarshal(wt, nd)
+		MeshInstanceNodeMarshal(wt, nd, v)
 	}
 }
 
-func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
+func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) {
 	writeLittleByte(wt, uint32(len(instNd.Transfors)))
 	for _, mt := range instNd.Transfors {
 		writeLittleByte(wt, mt[0][:])
@@ -757,7 +760,7 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 		writeLittleByte(wt, f)
 	}
 	writeLittleByte(wt, instNd.BBox)
-	baseMeshMarshal(wt, instNd.Mesh)
+	baseMeshMarshal(wt, instNd.Mesh, v)
 	writeLittleByte(wt, instNd.Hash)
 }
 
