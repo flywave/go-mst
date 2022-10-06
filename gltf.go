@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"io"
 
+	"github.com/flywave/gltf/ext/specular"
 	mat4d "github.com/flywave/go3d/float64/mat4"
 
 	"github.com/qmuntal/gltf"
@@ -440,32 +441,32 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
 
-			// spmtl := &specular.PBRSpecularGlossiness{
-			// 	DiffuseFactor: &[4]float32{float32(ml.Diffuse[0]) / 255, float32(ml.Diffuse[1]) / 255, float32(ml.Diffuse[2]) / 255, 1},
-			// }
+			spmtl := &specular.PBRSpecularGlossiness{
+				DiffuseFactor: &[4]float32{float32(ml.Diffuse[0]) / 255, float32(ml.Diffuse[1]) / 255, float32(ml.Diffuse[2]) / 255, 1},
+			}
 
 			gm.EmissiveFactor[0] = float32(ml.Emissive[0]) / 255
 			gm.EmissiveFactor[1] = float32(ml.Emissive[1]) / 255
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
-			// gm.Extensions[specular.ExtensionName] = spmtl
-			// doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
+			gm.Extensions[specular.ExtensionName] = spmtl
+			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
 		case *PhongMaterial:
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
 
-			// spmtl := &specular.PBRSpecularGlossiness{
-			// 	DiffuseFactor:    &[4]float32{float32(ml.Diffuse[0]) / 255, float32(ml.Diffuse[1]) / 255, float32(ml.Diffuse[2]) / 255, 1},
-			// 	SpecularFactor:   &[3]float32{float32(ml.Specular[0]) / 255, float32(ml.Specular[1]) / 255, float32(ml.Specular[2]) / 255},
-			// 	GlossinessFactor: &ml.Shininess,
-			// }
+			spmtl := &specular.PBRSpecularGlossiness{
+				DiffuseFactor:    &[4]float32{float32(ml.Diffuse[0]) / 255, float32(ml.Diffuse[1]) / 255, float32(ml.Diffuse[2]) / 255, 1},
+				SpecularFactor:   &[3]float32{float32(ml.Specular[0]) / 255, float32(ml.Specular[1]) / 255, float32(ml.Specular[2]) / 255},
+				GlossinessFactor: &ml.Shininess,
+			}
 
 			gm.EmissiveFactor[0] = float32(ml.Emissive[0]) / 255
 			gm.EmissiveFactor[1] = float32(ml.Emissive[1]) / 255
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
-			// gm.Extensions[specular.ExtensionName] = spmtl
-			// doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
+			gm.Extensions[specular.ExtensionName] = spmtl
+			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
 		case *TextureMaterial:
 			texMtl = ml
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
