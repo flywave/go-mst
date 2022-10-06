@@ -6,8 +6,8 @@ import (
 	"image/png"
 	"io"
 
-	"github.com/flywave/gltf/ext/specular"
 	mat4d "github.com/flywave/go3d/float64/mat4"
+	"github.com/qmuntal/gltf/ext/specular"
 
 	"github.com/qmuntal/gltf"
 )
