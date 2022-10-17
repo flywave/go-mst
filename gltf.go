@@ -416,6 +416,7 @@ func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Textur
 
 func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 	texMap := make(map[int32]uint32)
+	useExtension := false
 	for i := range mts {
 		mtl := mts[i]
 
@@ -450,7 +451,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
 			gm.Extensions[specular.ExtensionName] = spmtl
-			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
+			useExtension = true
 		case *PhongMaterial:
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
@@ -466,7 +467,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
 			gm.Extensions[specular.ExtensionName] = spmtl
-			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
+			useExtension = true
 		case *TextureMaterial:
 			texMtl = ml
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
@@ -492,6 +493,18 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 		}
 
 		doc.Materials = append(doc.Materials, gm)
+	}
+	if useExtension {
+		has := false
+		for _, nm := range doc.ExtensionsUsed {
+			if nm == specular.ExtensionName {
+				has = true
+				break
+			}
+		}
+		if !has {
+			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
+		}
 	}
 	return nil
 }
