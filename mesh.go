@@ -29,6 +29,7 @@ const MESH_SIGNATURE string = "fwtm"
 const MSTEXT string = ".mst"
 const V1 uint32 = 1
 const V2 uint32 = 2
+const V3 uint32 = 3
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0
@@ -265,7 +266,7 @@ func (n *MeshNode) ReComputeNormal() {
 
 type InstanceMesh struct {
 	Transfors []*dmat.T
-	Features  []uint32
+	Features  []uint64
 	BBox      *[6]float64
 	Mesh      *BaseMesh
 	Hash      uint64
@@ -302,7 +303,7 @@ type Mesh struct {
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: V2}
+	return &Mesh{Version: V3}
 }
 
 func (m *Mesh) NodeCount() int {
@@ -787,10 +788,17 @@ func MeshInstanceNodeUnMarshal(rd io.Reader, v uint32) *InstanceMesh {
 	}
 	var fsize uint32
 	readLittleByte(rd, &fsize)
-	inst.Features = make([]uint32, fsize)
-	for i := range inst.Features {
-		readLittleByte(rd, &inst.Features[i])
+	inst.Features = make([]uint64, fsize)
+	if v < V3 {
+		fs := make([]uint32, fsize)
+		readLittleByte(rd, &fs)
+		for i, f := range fs {
+			inst.Features[i] = uint64(f)
+		}
+	} else {
+		readLittleByte(rd, &inst.Features)
 	}
+
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
 	inst.Mesh = baseMeshUnMarshal(rd, v)

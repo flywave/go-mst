@@ -53,13 +53,13 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf3(t *testing.T) {
-	f, _ := os.Open("/home/hj/snap/dukto/16/model_hill_0.mst_exchange.mst")
+	f, _ := os.Open("/home/hj/workspace/flywave-3dtile-plugin/server/tests/linan2/0aa8d212919cce3150db8382928e710b/model.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
 	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/snap/dukto/16/model_hill_0.mst_exchange.glb", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/flywave-3dtile-plugin/server/tests/linan2/0aa8d212919cce3150db8382928e710b/model.mst.gltf", bt, os.ModePerm)
 }
 
 func TestGltf(t *testing.T) {
