@@ -6,9 +6,9 @@ import (
 	"image/png"
 	"io"
 
-	mat4d "github.com/flywave/go3d/float64/mat4"
 	"github.com/qmuntal/gltf/ext/specular"
 
+	mat4d "github.com/flywave/go3d/float64/mat4"
 	"github.com/qmuntal/gltf"
 )
 
@@ -98,24 +98,12 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 }
 
 func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline bool) error {
-	err := buildGltf(doc, &mh.BaseMesh, true, exportOutline)
+	err := buildGltf(doc, &mh.BaseMesh, nil, exportOutline)
 	if err != nil {
 		return err
 	}
 	for _, inst := range mh.InstanceNode {
-		meshId := uint32(len(doc.Meshes))
-		buildGltf(doc, inst.Mesh, false, false)
-		for _, mt := range inst.Transfors {
-			position, quat, scale := mat4d.Decompose(mt)
-			nd := gltf.Node{
-				Mesh:        &meshId,
-				Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
-				Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
-				Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
-			}
-			doc.Nodes = append(doc.Nodes, &nd)
-			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
-		}
+		buildGltf(doc, inst.Mesh, inst.Transfors, false)
 	}
 
 	return nil
@@ -338,17 +326,29 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	return mesh, accessors
 }
 
-func buildGltf(doc *gltf.Document, mh *BaseMesh, appendNode bool, exportOutline bool) error {
+func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline bool) error {
 	ctx := &buildContext{}
 	ctx.mtlSize = uint32(len(doc.Materials))
 
 	for _, nd := range mh.Nodes {
-		if appendNode {
+		l := (uint32)(len(doc.Meshes))
+		if trans == nil {
 			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
 			node := &gltf.Node{}
-			l := (uint32)(len(doc.Meshes))
 			node.Mesh = &l
 			doc.Nodes = append(doc.Nodes, node)
+		} else {
+			for _, mt := range trans {
+				position, quat, scale := mat4d.Decompose(mt)
+				nd := gltf.Node{
+					Mesh:        &l,
+					Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
+					Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
+					Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
+				}
+				doc.Nodes = append(doc.Nodes, &nd)
+				doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
+			}
 		}
 
 		if exportOutline && len(nd.EdgeGroup) > 0 {

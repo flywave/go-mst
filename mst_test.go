@@ -53,7 +53,7 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf3(t *testing.T) {
-	f, _ := os.Open("/home/hj/workspace/flywave-3dtile-plugin/server/tests/linan2/0aa8d212919cce3150db8382928e710b/model.mst")
+	f, _ := os.Open("/home/hj/workspace/flywave-mesh-editor/data/cmps/out_1_2_tower_0.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
@@ -257,7 +257,7 @@ func TestPipe(t *testing.T) {
 }
 
 func TestMst2Gltf(t *testing.T) {
-	f, _ := os.Open("tests/zqesgum1j7fjjrfmou5q7br6me.mst")
+	f, _ := os.Open("../flywave-mesh-editor/data/widgets/jueyuanzi13_insulator.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
