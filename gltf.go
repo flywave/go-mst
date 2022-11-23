@@ -492,6 +492,16 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.PBRMetallicRoughness.BaseColorFactor = cl
 		}
 
+		if gm.PBRMetallicRoughness.MetallicFactor == nil {
+			mc := float32(0)
+			gm.PBRMetallicRoughness.MetallicFactor = &mc
+		}
+
+		if gm.PBRMetallicRoughness.RoughnessFactor == nil {
+			rg := float32(1)
+			gm.PBRMetallicRoughness.RoughnessFactor = &rg
+		}
+
 		doc.Materials = append(doc.Materials, gm)
 	}
 	if useExtension {

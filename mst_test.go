@@ -257,7 +257,7 @@ func TestPipe(t *testing.T) {
 }
 
 func TestMst2Gltf(t *testing.T) {
-	f, _ := os.Open("../flywave-mesh-editor/data/widgets/jueyuanzi13_insulator.mst")
+	f, _ := os.Open("/home/hj/下载/out_12_13_tower_1_exchange (1).mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
