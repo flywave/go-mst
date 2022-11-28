@@ -257,11 +257,11 @@ func TestPipe(t *testing.T) {
 }
 
 func TestMst2Gltf(t *testing.T) {
-	f, _ := os.Open("/home/hj/下载/out_12_13_tower_1_exchange (1).mst")
+	f, _ := os.Open("tests/TieGui_TWO.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
 	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("tests/decal.glb", bt, os.ModePerm)
+	ioutil.WriteFile("tests/TieGui_TWO.glb", bt, os.ModePerm)
 }
