@@ -243,7 +243,7 @@ func ThreejsBin2Mst(fpath string) (*Mesh, error) {
 		mesh.Materials = append(mesh.Materials, ml)
 	}
 
-	nd.ResortVtVn()
+	nd.ResortVtVn(mesh)
 	// nd.ReComputeNormal()
 	mesh.Nodes = append(mesh.Nodes, nd)
 	return mesh, nil

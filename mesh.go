@@ -193,11 +193,12 @@ type MeshNode struct {
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
 }
 
-func (n *MeshNode) ResortVtVn() {
+func (n *MeshNode) ResortVtVn(m *Mesh) {
 	var vs, vns []vec3.T
 	var vts []vec2.T
 	var idx uint32
 	for _, g := range n.FaceGroup {
+		repete := false
 		for _, f := range g.Faces {
 			if f.Normal != nil {
 				vns = append(vns, n.Normals[int((*f.Normal)[0])])
@@ -209,9 +210,17 @@ func (n *MeshNode) ResortVtVn() {
 				vns = append(vns, vec3.T{0, 0, 1})
 			}
 			if f.Uv != nil {
-				vts = append(vts, n.TexCoords[int((*f.Uv)[0])])
+				v := n.TexCoords[int((*f.Uv)[0])]
+				vts = append(vts, v)
+				repete = repete || v[0] > 1.1 || v[1] > 1.1
+
+				v = n.TexCoords[int((*f.Uv)[1])]
 				vts = append(vts, n.TexCoords[int((*f.Uv)[1])])
+				repete = repete || v[0] > 1.1 || v[1] > 1.1
+
+				v = n.TexCoords[int((*f.Uv)[2])]
 				vts = append(vts, n.TexCoords[int((*f.Uv)[2])])
+				repete = repete || v[0] > 1.1 || v[1] > 1.1
 			} else {
 				vts = append(vts, vec2.T{0, 0})
 				vts = append(vts, vec2.T{0, 0})
@@ -222,6 +231,11 @@ func (n *MeshNode) ResortVtVn() {
 			vs = append(vs, n.Vertices[int(f.Vertex[2])])
 			f.Vertex = [3]uint32{idx, uint32(idx + 1), uint32(idx + 2)}
 			idx += 3
+		}
+
+		mtl := m.Materials[int(g.Batchid)]
+		if mtl.HasTexture() {
+			mtl.GetTexture().Repeated = repete
 		}
 	}
 	n.Vertices = vs
