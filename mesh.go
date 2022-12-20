@@ -276,6 +276,7 @@ func (nd *MeshNode) GetBoundbox() *[6]float64 {
 type BaseMesh struct {
 	Materials []MeshMaterial `json:"materials,omitempty"`
 	Nodes     []*MeshNode    `json:"nodes,omitempty"`
+	Code      uint32         `json:"code,omitempty"`
 }
 
 type Mesh struct {
@@ -674,11 +675,17 @@ func MeshMarshal(wt io.Writer, ms *Mesh) {
 	writeLittleByte(wt, ms.Version)
 	baseMeshMarshal(wt, &ms.BaseMesh)
 	MeshInstanceNodesMarshal(wt, ms.InstanceNode)
+	if false {
+		writeLittleByte(wt, ms.Code)
+	}
 }
 
 func baseMeshMarshal(wt io.Writer, ms *BaseMesh) {
 	MtlsMarshal(wt, ms.Materials)
 	MeshNodesMarshal(wt, ms.Nodes)
+	if false {
+		writeLittleByte(wt, ms.Code)
+	}
 }
 
 func MeshUnMarshal(rd io.Reader) *Mesh {
@@ -688,6 +695,9 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	readLittleByte(rd, &ms.Version)
 	ms.BaseMesh = *baseMeshUnMarshal(rd)
 	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd)
+	if false {
+		readLittleByte(rd, &ms.Code)
+	}
 	return &ms
 }
 
@@ -695,6 +705,9 @@ func baseMeshUnMarshal(rd io.Reader) *BaseMesh {
 	ms := &BaseMesh{}
 	ms.Materials = MtlsUnMarshal(rd)
 	ms.Nodes = MeshNodesUnMarshal(rd)
+	if false {
+		readLittleByte(rd, &ms.Code)
+	}
 	return ms
 }
 
