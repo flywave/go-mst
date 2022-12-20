@@ -6,10 +6,10 @@ import (
 	"image/png"
 	"io"
 
-	mat4d "github.com/flywave/go3d/float64/mat4"
-
-	"github.com/qmuntal/gltf"
 	"github.com/qmuntal/gltf/ext/specular"
+
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	"github.com/qmuntal/gltf"
 )
 
 const GLTF_VERSION = "2.0"
@@ -98,35 +98,24 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 }
 
 func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline bool) error {
-	err := buildGltf(doc, &mh.BaseMesh, true, exportOutline)
+	err := buildGltf(doc, &mh.BaseMesh, nil, exportOutline)
 	if err != nil {
 		return err
 	}
 	for _, inst := range mh.InstanceNode {
-		meshId := uint32(len(doc.Meshes))
-		buildGltf(doc, inst.Mesh, false, false)
-		for _, mt := range inst.Transfors {
-			position, quat, scale := mat4d.Decompose(mt)
-			nd := gltf.Node{
-				Mesh:        &meshId,
-				Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
-				Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
-				Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
-			}
-			doc.Nodes = append(doc.Nodes, &nd)
-			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
-		}
+		buildGltf(doc, inst.Mesh, inst.Transfors, false)
 	}
 
 	return nil
 }
 
 type buildContext struct {
-	mtlSize uint32
-	bvIndex uint32
-	bvPos   uint32
-	bvTex   uint32
-	bvNorm  uint32
+	mtlSize       uint32
+	bvIndex       uint32
+	bvPos         uint32
+	bvTex         uint32
+	bvNorm        uint32
+	indexAccStart uint32
 }
 
 func buildMeshBuffer(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, nd *MeshNode) []*gltf.BufferView {
@@ -265,7 +254,6 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	aftIndices := uint32(len(nd.FaceGroup))
 	idx := uint32(len(accessors))
 	indexPos := aftIndices + idx
-	var start uint32 = 0
 	for i := range nd.FaceGroup {
 		tmp := indexPos
 		patch := nd.FaceGroup[i]
@@ -298,9 +286,7 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 		indexacc := &gltf.Accessor{}
 		indexacc.ComponentType = gltf.ComponentUint
 
-		indexacc.ByteOffset = start * 12
 		indexacc.Count = uint32(len(patch.Faces)) * 3
-		start += uint32(len(patch.Faces))
 		bfindex := ctx.bvIndex
 		indexacc.BufferView = &bfindex
 		accessors = append(accessors, indexacc)
@@ -311,7 +297,8 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	posacc.Type = gltf.AccessorVec3
 	posacc.Count = uint32(len(nd.Vertices))
 
-	posacc.BufferView = &ctx.bvPos
+	bvPos := ctx.bvPos
+	posacc.BufferView = &bvPos
 	box := nd.GetBoundbox()
 	posacc.Min = []float32{float32(box[0]), float32(box[1]), float32(box[2])}
 	posacc.Max = []float32{float32(box[3]), float32(box[4]), float32(box[5])}
@@ -322,7 +309,8 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 		texacc.ComponentType = gltf.ComponentFloat
 		texacc.Type = gltf.AccessorVec2
 		texacc.Count = uint32(len(nd.TexCoords))
-		texacc.BufferView = &ctx.bvTex
+		bvTex := ctx.bvTex
+		texacc.BufferView = &bvTex
 		accessors = append(accessors, texacc)
 	}
 
@@ -331,23 +319,36 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 		nlacc.ComponentType = gltf.ComponentFloat
 		nlacc.Type = gltf.AccessorVec3
 		nlacc.Count = uint32(len(nd.Normals))
-		nlacc.BufferView = &ctx.bvNorm
+		bvNorm := ctx.bvNorm
+		nlacc.BufferView = &bvNorm
 		accessors = append(accessors, nlacc)
 	}
 	return mesh, accessors
 }
 
-func buildGltf(doc *gltf.Document, mh *BaseMesh, appendNode bool, exportOutline bool) error {
+func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline bool) error {
 	ctx := &buildContext{}
 	ctx.mtlSize = uint32(len(doc.Materials))
 
 	for _, nd := range mh.Nodes {
-		if appendNode {
+		l := (uint32)(len(doc.Meshes))
+		if trans == nil {
 			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
 			node := &gltf.Node{}
-			l := (uint32)(len(doc.Meshes))
 			node.Mesh = &l
 			doc.Nodes = append(doc.Nodes, node)
+		} else {
+			for _, mt := range trans {
+				position, quat, scale := mat4d.Decompose(mt)
+				nd := gltf.Node{
+					Mesh:        &l,
+					Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
+					Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
+					Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
+				}
+				doc.Nodes = append(doc.Nodes, &nd)
+				doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
+			}
 		}
 
 		if exportOutline && len(nd.EdgeGroup) > 0 {
@@ -415,11 +416,13 @@ func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Textur
 
 func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 	texMap := make(map[int32]uint32)
+	useExtension := false
 	for i := range mts {
 		mtl := mts[i]
 
 		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.AlphaMask}
 		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{BaseColorFactor: &[4]float32{1, 1, 1, 1}}
+		gm.Extensions = make(map[string]interface{})
 		var texMtl *TextureMaterial
 		var cl *[4]float32
 		switch ml := mtl.(type) {
@@ -448,6 +451,7 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
 			gm.Extensions[specular.ExtensionName] = spmtl
+			useExtension = true
 		case *PhongMaterial:
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 			texMtl = &ml.TextureMaterial
@@ -463,12 +467,13 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
 
 			gm.Extensions[specular.ExtensionName] = spmtl
+			useExtension = true
 		case *TextureMaterial:
 			texMtl = ml
 			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
 		}
 
-		if texMtl.HasTexture() {
+		if texMtl != nil && texMtl.HasTexture() {
 			if idx, ok := texMap[texMtl.Texture.Id]; ok {
 				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: idx}
 			} else {
@@ -487,7 +492,29 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			gm.PBRMetallicRoughness.BaseColorFactor = cl
 		}
 
+		if gm.PBRMetallicRoughness.MetallicFactor == nil {
+			mc := float32(0)
+			gm.PBRMetallicRoughness.MetallicFactor = &mc
+		}
+
+		if gm.PBRMetallicRoughness.RoughnessFactor == nil {
+			rg := float32(1)
+			gm.PBRMetallicRoughness.RoughnessFactor = &rg
+		}
+
 		doc.Materials = append(doc.Materials, gm)
+	}
+	if useExtension {
+		has := false
+		for _, nm := range doc.ExtensionsUsed {
+			if nm == specular.ExtensionName {
+				has = true
+				break
+			}
+		}
+		if !has {
+			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
+		}
 	}
 	return nil
 }

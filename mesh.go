@@ -14,12 +14,11 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
 
+	dvec3 "github.com/flywave/go3d/float64/vec3"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 	"golang.org/x/image/bmp"
@@ -29,6 +28,9 @@ import (
 const MESH_SIGNATURE string = "fwtm"
 const MSTEXT string = ".mst"
 const V1 uint32 = 1
+const V2 uint32 = 2
+const V3 uint32 = 3
+const V4 uint32 = 4
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0
@@ -76,6 +78,9 @@ const (
 
 type MeshMaterial interface {
 	HasTexture() bool
+	GetTexture() *Texture
+	GetColor() [3]byte
+	GetEmissive() [3]byte
 }
 
 type Texture struct {
@@ -98,6 +103,18 @@ func (m *BaseMaterial) HasTexture() bool {
 	return false
 }
 
+func (m *BaseMaterial) GetEmissive() [3]byte {
+	return [3]byte{0, 0, 0}
+}
+
+func (m *BaseMaterial) GetTexture() *Texture {
+	return nil
+}
+
+func (m *BaseMaterial) GetColor() [3]byte {
+	return m.Color
+}
+
 type TextureMaterial struct {
 	BaseMaterial
 	Texture *Texture `json:"texture,omitempty"`
@@ -108,9 +125,13 @@ func (m *TextureMaterial) HasTexture() bool {
 	return m.Texture != nil
 }
 
+func (m *TextureMaterial) GetTexture() *Texture {
+	return m.Texture
+}
+
 type PbrMaterial struct {
 	TextureMaterial
-	Emissive            [4]byte `json:"emissive"`
+	Emissive            [3]byte `json:"emissive"`
 	Metallic            float32 `json:"metallic"`
 	Roughness           float32 `json:"roughness"`
 	Reflectance         float32 `json:"reflectance"`
@@ -126,6 +147,10 @@ type PbrMaterial struct {
 	SubSurfaceColor     [3]byte `json:"subSurfaceColor"` // subsurface or cloth
 }
 
+func (m *PbrMaterial) GetEmissive() [3]byte {
+	return m.Emissive
+}
+
 type LambertMaterial struct {
 	TextureMaterial
 	Ambient  [3]byte `json:"ambient"`
@@ -138,6 +163,10 @@ type PhongMaterial struct {
 	Specular    [3]byte `json:"specular"`
 	Shininess   float32 `json:"shininess"`
 	Specularity float32 `json:"specularity"`
+}
+
+func (m *LambertMaterial) GetEmissive() [3]byte {
+	return m.Emissive
 }
 
 type Face struct {
@@ -165,11 +194,12 @@ type MeshNode struct {
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
 }
 
-func (n *MeshNode) ResortVtVn() {
+func (n *MeshNode) ResortVtVn(m *Mesh) {
 	var vs, vns []vec3.T
 	var vts []vec2.T
 	var idx uint32
 	for _, g := range n.FaceGroup {
+		repete := false
 		for _, f := range g.Faces {
 			if f.Normal != nil {
 				vns = append(vns, n.Normals[int((*f.Normal)[0])])
@@ -181,9 +211,17 @@ func (n *MeshNode) ResortVtVn() {
 				vns = append(vns, vec3.T{0, 0, 1})
 			}
 			if f.Uv != nil {
-				vts = append(vts, n.TexCoords[int((*f.Uv)[0])])
+				v := n.TexCoords[int((*f.Uv)[0])]
+				vts = append(vts, v)
+				repete = repete || v[0] > 1.1 || v[1] > 1.1
+
+				v = n.TexCoords[int((*f.Uv)[1])]
 				vts = append(vts, n.TexCoords[int((*f.Uv)[1])])
+				repete = repete || v[0] > 1.1 || v[1] > 1.1
+
+				v = n.TexCoords[int((*f.Uv)[2])]
 				vts = append(vts, n.TexCoords[int((*f.Uv)[2])])
+				repete = repete || v[0] > 1.1 || v[1] > 1.1
 			} else {
 				vts = append(vts, vec2.T{0, 0})
 				vts = append(vts, vec2.T{0, 0})
@@ -194,6 +232,11 @@ func (n *MeshNode) ResortVtVn() {
 			vs = append(vs, n.Vertices[int(f.Vertex[2])])
 			f.Vertex = [3]uint32{idx, uint32(idx + 1), uint32(idx + 2)}
 			idx += 3
+		}
+
+		mtl := m.Materials[int(g.Batchid)]
+		if mtl.HasTexture() {
+			mtl.GetTexture().Repeated = repete
 		}
 	}
 	n.Vertices = vs
@@ -209,46 +252,36 @@ func (n *MeshNode) ReComputeNormal() {
 			pt2 := n.Vertices[f.Vertex[1]]
 			pt3 := n.Vertices[f.Vertex[2]]
 
-			sub1 := vec3.Sub(&pt2, &pt1)
-			sub1.Normalize()
-			sub2 := vec3.Sub(&pt3, &pt1)
-			sub2.Normalize()
+			sub1 := vec3.Sub(&pt3, &pt2)
+			sub2 := vec3.Sub(&pt1, &pt2)
 
 			cro := vec3.Cross(&sub1, &sub2)
-			cro.Normalize()
-
-			areaPerFace := triangleArea(&pt1, &pt2)
-
-			weightedNormal := cro.Scale(float32(areaPerFace))
+			l := cro.Length()
+			f.Normal = &f.Vertex
+			if l == 0 {
+				continue
+			}
+			weightedNormal := cro.Scale(1 / l)
 
 			n1 := &normals[f.Vertex[0]]
 			n1.Add(weightedNormal)
 			n1.Normalize()
 
-			n2 := &normals[f.Vertex[0]]
+			n2 := &normals[f.Vertex[1]]
 			n2.Add(weightedNormal)
 			n2.Normalize()
 
-			n3 := &normals[f.Vertex[0]]
+			n3 := &normals[f.Vertex[2]]
 			n3.Add(weightedNormal)
 			n3.Normalize()
-
-			f.Normal = &f.Vertex
 		}
 	}
 	n.Normals = normals
 }
 
-func triangleArea(a, b *vec3.T) float64 {
-	i := math.Pow(float64(a[1]*b[2]-a[2]*b[1]), 2)
-	j := math.Pow(float64(a[2]*b[0]-a[0]*b[2]), 2)
-	k := math.Pow(float64(a[0]*b[1]-a[1]*b[0]), 2)
-	return 0.5 * math.Sqrt(i+j+k)
-}
-
 type InstanceMesh struct {
 	Transfors []*dmat.T
-	Features  []uint32
+	Features  []uint64
 	BBox      *[6]float64
 	Mesh      *BaseMesh
 	Hash      uint64
@@ -286,7 +319,7 @@ type Mesh struct {
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: V1}
+	return &Mesh{Version: V4}
 }
 
 func (m *Mesh) NodeCount() int {
@@ -295,6 +328,22 @@ func (m *Mesh) NodeCount() int {
 
 func (m *Mesh) MaterialCount() int {
 	return len(m.Materials)
+}
+
+func (m *Mesh) ComputeBBox() dvec3.Box {
+	if len(m.Nodes) == 0 {
+		return dvec3.Box{}
+	}
+
+	bbox := dvec3.MinBox
+	for _, nd := range m.Nodes {
+		bx := nd.GetBoundbox()
+		min := dvec3.T{bx[0], bx[1], bx[2]}
+		max := dvec3.T{bx[3], bx[4], bx[5]}
+		bbx := dvec3.Box{Min: min, Max: max}
+		bbox.Join(&bbx)
+	}
+	return bbox
 }
 
 func toLittleByteOrder(v interface{}) []byte {
@@ -395,9 +444,12 @@ func TextureMaterialUnMarshal(rd io.Reader) *TextureMaterial {
 	return &tmtl
 }
 
-func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial) {
+func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial, v uint32) {
 	TextureMaterialMarshal(wt, &mtl.TextureMaterial)
 	writeLittleByte(wt, mtl.Emissive[:])
+	if v < 2 {
+		writeLittleByte(wt, byte(255))
+	}
 	writeLittleByte(wt, &mtl.Metallic)
 	writeLittleByte(wt, &mtl.Roughness)
 	writeLittleByte(wt, &mtl.Reflectance)
@@ -413,11 +465,15 @@ func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial) {
 	writeLittleByte(wt, mtl.SubSurfaceColor[:])
 }
 
-func PbrMaterialUnMarshal(rd io.Reader) *PbrMaterial {
+func PbrMaterialUnMarshal(rd io.Reader, v uint32) *PbrMaterial {
 	mtl := PbrMaterial{}
 	tmtl := TextureMaterialUnMarshal(rd)
 	mtl.TextureMaterial = *tmtl
 	readLittleByte(rd, mtl.Emissive[:])
+	if v < 2 {
+		var b byte
+		readLittleByte(rd, &b)
+	}
 	readLittleByte(rd, &mtl.Metallic)
 	readLittleByte(rd, &mtl.Roughness)
 	readLittleByte(rd, &mtl.Reflectance)
@@ -468,7 +524,7 @@ func PhongMaterialUnMarshal(rd io.Reader) *PhongMaterial {
 	return &mtl
 }
 
-func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
+func MaterialMarshal(wt io.Writer, mt MeshMaterial, v uint32) {
 	switch mtl := mt.(type) {
 	case *BaseMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_COLOR))
@@ -478,7 +534,7 @@ func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
 		TextureMaterialMarshal(wt, mtl)
 	case *PbrMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PBR))
-		PbrMaterialMarshal(wt, mtl)
+		PbrMaterialMarshal(wt, mtl, v)
 	case *LambertMaterial:
 		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT))
 		LambertMaterialMarshal(wt, mtl)
@@ -488,7 +544,7 @@ func MaterialMarshal(wt io.Writer, mt MeshMaterial) {
 	}
 }
 
-func MaterialUnMarshal(rd io.Reader) MeshMaterial {
+func MaterialUnMarshal(rd io.Reader, v uint32) MeshMaterial {
 	var ty uint32
 	readLittleByte(rd, &ty)
 	switch int(ty) {
@@ -497,7 +553,7 @@ func MaterialUnMarshal(rd io.Reader) MeshMaterial {
 	case MESH_TRIANGLE_MATERIAL_TYPE_TEXTURE:
 		return TextureMaterialUnMarshal(rd)
 	case MESH_TRIANGLE_MATERIAL_TYPE_PBR:
-		return PbrMaterialUnMarshal(rd)
+		return PbrMaterialUnMarshal(rd, v)
 	case MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT:
 		return LambertMaterialUnMarshal(rd)
 	case MESH_TRIANGLE_MATERIAL_TYPE_PHONG:
@@ -507,19 +563,19 @@ func MaterialUnMarshal(rd io.Reader) MeshMaterial {
 	}
 }
 
-func MtlsMarshal(wt io.Writer, mtls []MeshMaterial) {
+func MtlsMarshal(wt io.Writer, mtls []MeshMaterial, v uint32) {
 	writeLittleByte(wt, uint32(len(mtls)))
 	for _, mtl := range mtls {
-		MaterialMarshal(wt, mtl)
+		MaterialMarshal(wt, mtl, v)
 	}
 }
 
-func MtlsUnMarshal(rd io.Reader) []MeshMaterial {
+func MtlsUnMarshal(rd io.Reader, v uint32) []MeshMaterial {
 	var size uint32
 	readLittleByte(rd, &size)
 	mtls := make([]MeshMaterial, size)
 	for i := 0; i < int(size); i++ {
-		mtls[i] = MaterialUnMarshal(rd)
+		mtls[i] = MaterialUnMarshal(rd, v)
 	}
 	return mtls
 }
@@ -673,17 +729,17 @@ func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 func MeshMarshal(wt io.Writer, ms *Mesh) {
 	wt.Write([]byte(MESH_SIGNATURE))
 	writeLittleByte(wt, ms.Version)
-	baseMeshMarshal(wt, &ms.BaseMesh)
-	MeshInstanceNodesMarshal(wt, ms.InstanceNode)
-	if false {
+	baseMeshMarshal(wt, &ms.BaseMesh, ms.Version)
+	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
+	if ms.Version == V4 {
 		writeLittleByte(wt, ms.Code)
 	}
 }
 
-func baseMeshMarshal(wt io.Writer, ms *BaseMesh) {
-	MtlsMarshal(wt, ms.Materials)
+func baseMeshMarshal(wt io.Writer, ms *BaseMesh, v uint32) {
+	MtlsMarshal(wt, ms.Materials, v)
 	MeshNodesMarshal(wt, ms.Nodes)
-	if false {
+	if v == V4 {
 		writeLittleByte(wt, ms.Code)
 	}
 }
@@ -693,32 +749,32 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	sig := make([]byte, 4)
 	rd.Read(sig)
 	readLittleByte(rd, &ms.Version)
-	ms.BaseMesh = *baseMeshUnMarshal(rd)
-	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd)
-	if false {
+	ms.BaseMesh = *baseMeshUnMarshal(rd, ms.Version)
+	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
+	if ms.Version == V4 {
 		readLittleByte(rd, &ms.Code)
 	}
 	return &ms
 }
 
-func baseMeshUnMarshal(rd io.Reader) *BaseMesh {
+func baseMeshUnMarshal(rd io.Reader, v uint32) *BaseMesh {
 	ms := &BaseMesh{}
-	ms.Materials = MtlsUnMarshal(rd)
+	ms.Materials = MtlsUnMarshal(rd, v)
 	ms.Nodes = MeshNodesUnMarshal(rd)
-	if false {
+	if v == V4 {
 		readLittleByte(rd, &ms.Code)
 	}
 	return ms
 }
 
-func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh) {
+func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh, v uint32) {
 	writeLittleByte(wt, uint32(len(instNd)))
 	for _, nd := range instNd {
-		MeshInstanceNodeMarshal(wt, nd)
+		MeshInstanceNodeMarshal(wt, nd, v)
 	}
 }
 
-func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
+func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) {
 	writeLittleByte(wt, uint32(len(instNd.Transfors)))
 	for _, mt := range instNd.Transfors {
 		writeLittleByte(wt, mt[0][:])
@@ -731,21 +787,21 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh) {
 		writeLittleByte(wt, f)
 	}
 	writeLittleByte(wt, instNd.BBox)
-	baseMeshMarshal(wt, instNd.Mesh)
+	baseMeshMarshal(wt, instNd.Mesh, v)
 	writeLittleByte(wt, instNd.Hash)
 }
 
-func MeshInstanceNodesUnMarshal(rd io.Reader) []*InstanceMesh {
+func MeshInstanceNodesUnMarshal(rd io.Reader, v uint32) []*InstanceMesh {
 	var size uint32
 	readLittleByte(rd, &size)
 	nds := make([]*InstanceMesh, size)
 	for i := range nds {
-		nds[i] = MeshInstanceNodeUnMarshal(rd)
+		nds[i] = MeshInstanceNodeUnMarshal(rd, v)
 	}
 	return nds
 }
 
-func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
+func MeshInstanceNodeUnMarshal(rd io.Reader, v uint32) *InstanceMesh {
 	inst := &InstanceMesh{}
 	var size uint32
 	readLittleByte(rd, &size)
@@ -760,13 +816,20 @@ func MeshInstanceNodeUnMarshal(rd io.Reader) *InstanceMesh {
 	}
 	var fsize uint32
 	readLittleByte(rd, &fsize)
-	inst.Features = make([]uint32, fsize)
-	for i := range inst.Features {
-		readLittleByte(rd, &inst.Features[i])
+	inst.Features = make([]uint64, fsize)
+	if v < V3 {
+		fs := make([]uint32, fsize)
+		readLittleByte(rd, &fs)
+		for i, f := range fs {
+			inst.Features[i] = uint64(f)
+		}
+	} else {
+		readLittleByte(rd, &inst.Features)
 	}
+
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
-	inst.Mesh = baseMeshUnMarshal(rd)
+	inst.Mesh = baseMeshUnMarshal(rd, v)
 	readLittleByte(rd, &inst.Hash)
 	return inst
 }
@@ -853,23 +916,16 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 }
 
 func CreateTexture(name string, repet bool) (*Texture, error) {
-	file, err := os.Open(name)
+	reader, err := os.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	buf, err := ioutil.ReadAll(file)
+	defer reader.Close()
+	_, format, err := image.DecodeConfig(reader)
 	if err != nil {
 		return nil, err
 	}
-	format := path.Ext(name)
-	if format != "" {
-		format = format[1:]
-	} else {
-		format = "jpg"
-	}
-	format = strings.ToLower(format)
-	reader := bytes.NewBuffer([]byte(buf))
+	reader.Seek(0, io.SeekStart)
 	var img image.Image
 	switch format {
 	case "jpeg", "jpg":
@@ -892,7 +948,7 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 		for x := 0; x < bd.Dx(); x++ {
 			cl := img.At(x, y)
 			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			buf1 = append(buf1, byte(r), byte(g), byte(b), byte(a))
+			buf1 = append(buf1, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(a&0xff))
 		}
 	}
 

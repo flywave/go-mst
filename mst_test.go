@@ -16,6 +16,7 @@ import (
 	"github.com/flywave/go3d/float64/vec3"
 	fvec3 "github.com/flywave/go3d/vec3"
 	"github.com/qmuntal/gltf"
+	"github.com/xtgo/uuid"
 )
 
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
@@ -36,9 +37,9 @@ func TestToMst(t *testing.T) {
 			// 	}
 			// }
 			mh, _ := ThreejsBin2Mst(fpath)
-			// f, _ := os.Open(mstPh)
-			// mh := MeshUnMarshal(f)
-			// f.Close()
+			for _, nd := range mh.Nodes {
+				nd.ReComputeNormal()
+			}
 			doc := CreateDoc()
 			BuildGltf(doc, mh, false)
 			bt, _ := GetGltfBinary(doc, 8)
@@ -52,13 +53,13 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf3(t *testing.T) {
-	f, _ := os.Open("/home/hj/snap/dukto/16/model_hill_0.mst_exchange.mst")
+	f, _ := os.Open("/home/hj/workspace/flywave-mesh-editor/data/cmps/out_1_2_tower_0.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
 	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/snap/dukto/16/model_hill_0.mst_exchange.glb", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/flywave-3dtile-plugin/server/tests/linan2/0aa8d212919cce3150db8382928e710b/model.mst.gltf", bt, os.ModePerm)
 }
 
 func TestGltf(t *testing.T) {
@@ -88,7 +89,10 @@ func TestBin2(t *testing.T) {
 }
 
 func TestPipe2(t *testing.T) {
-	MstToObj("tests/BYjishuiqi.mst", "pvc")
+	id := uuid.NewRandom().String()
+
+	id = strings.ReplaceAll(id, "-", "")
+	fmt.Println(id)
 }
 
 func TestDe(t *testing.T) {
@@ -250,4 +254,14 @@ func TestPipe(t *testing.T) {
 		MeshWriteTo(lines2[i], ms)
 		MstToObj(lines2[i], fmt.Sprintf("%d", i))
 	}
+}
+
+func TestMst2Gltf(t *testing.T) {
+	f, _ := os.Open("tests/TieGui_TWO.mst")
+	mh := MeshUnMarshal(f)
+	mh.InstanceNode = nil
+	doc := CreateDoc()
+	BuildGltf(doc, mh, false)
+	bt, _ := GetGltfBinary(doc, 8)
+	ioutil.WriteFile("tests/TieGui_TWO.glb", bt, os.ModePerm)
 }
