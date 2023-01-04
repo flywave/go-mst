@@ -22,7 +22,7 @@ import (
 const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
 
 func TestToMst(t *testing.T) {
-	dirs := []string{"model", "anchormodel"} //
+	dirs := []string{"model/thsk/thsk_sw_xj"} //"anchormodel"
 	for _, d := range dirs {
 		dr := absPath + d
 		fs, _ := readDir(dr, dr, []string{".json"})
@@ -53,13 +53,13 @@ func TestToMst(t *testing.T) {
 }
 
 func TestGltf3(t *testing.T) {
-	f, _ := os.Open("/home/hj/workspace/flywave-mesh-editor/data/cmps/out_1_2_tower_0.mst")
+	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_sw_szk.mst")
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
 	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/flywave-3dtile-plugin/server/tests/linan2/0aa8d212919cce3150db8382928e710b/model.mst.gltf", bt, os.ModePerm)
+	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_xj/thsk_sw_xj.mst.glb", bt, os.ModePerm)
 }
 
 func TestGltf(t *testing.T) {

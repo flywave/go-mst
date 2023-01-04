@@ -110,12 +110,11 @@ func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline bool) error {
 }
 
 type buildContext struct {
-	mtlSize       uint32
-	bvIndex       uint32
-	bvPos         uint32
-	bvTex         uint32
-	bvNorm        uint32
-	indexAccStart uint32
+	mtlSize uint32
+	bvIndex uint32
+	bvPos   uint32
+	bvTex   uint32
+	bvNorm  uint32
 }
 
 func buildMeshBuffer(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, nd *MeshNode) []*gltf.BufferView {
@@ -254,6 +253,8 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	aftIndices := uint32(len(nd.FaceGroup))
 	idx := uint32(len(accessors))
 	indexPos := aftIndices + idx
+	var start uint32 = 0
+
 	for i := range nd.FaceGroup {
 		tmp := indexPos
 		patch := nd.FaceGroup[i]
@@ -285,8 +286,9 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 
 		indexacc := &gltf.Accessor{}
 		indexacc.ComponentType = gltf.ComponentUint
-
+		indexacc.ByteOffset = start * 12
 		indexacc.Count = uint32(len(patch.Faces)) * 3
+		start += uint32(len(patch.Faces))
 		bfindex := ctx.bvIndex
 		indexacc.BufferView = &bfindex
 		accessors = append(accessors, indexacc)
@@ -403,12 +405,12 @@ func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Textur
 	doc.BufferViews = append(doc.BufferViews, imgBuffView)
 	doc.Images = append(doc.Images, gimg)
 
-	var sp *gltf.Sampler
-	if texture.Repeated {
-		sp = &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
-	} else {
-		sp = &gltf.Sampler{WrapS: gltf.WrapClampToEdge, WrapT: gltf.WrapClampToEdge}
-	}
+	// var sp *gltf.Sampler
+	// if texture.Repeated {
+	sp := &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
+	// } else {
+	// 	sp = &gltf.Sampler{WrapS: gltf.WrapClampToEdge, WrapT: gltf.WrapClampToEdge}
+	// }
 	doc.Samplers = append(doc.Samplers, sp)
 
 	return tx, nil
@@ -477,14 +479,14 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 			if idx, ok := texMap[texMtl.Texture.Id]; ok {
 				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: idx}
 			} else {
-
+				texIndex := uint32(len(doc.Textures))
+				texMap[texMtl.Texture.Id] = texIndex
 				tex, err := buildTextureBuffer(doc, doc.Buffers[0], texMtl.Texture)
 
 				if err != nil {
 					return err
 				}
 
-				texIndex := uint32(len(doc.Textures))
 				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: texIndex}
 				doc.Textures = append(doc.Textures, tex)
 			}
