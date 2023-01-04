@@ -30,6 +30,7 @@ const MSTEXT string = ".mst"
 const V1 uint32 = 1
 const V2 uint32 = 2
 const V3 uint32 = 3
+const V4 uint32 = 4
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0
@@ -294,6 +295,7 @@ func (nd *MeshNode) GetBoundbox() *[6]float64 {
 type BaseMesh struct {
 	Materials []MeshMaterial `json:"materials,omitempty"`
 	Nodes     []*MeshNode    `json:"nodes,omitempty"`
+	Code      uint32         `json:"code,omitempty"`
 }
 
 type Mesh struct {
@@ -303,7 +305,7 @@ type Mesh struct {
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: V3}
+	return &Mesh{Version: V4}
 }
 
 func (m *Mesh) NodeCount() int {
@@ -715,11 +717,17 @@ func MeshMarshal(wt io.Writer, ms *Mesh) {
 	writeLittleByte(wt, ms.Version)
 	baseMeshMarshal(wt, &ms.BaseMesh, ms.Version)
 	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
+	if ms.Version == V4 {
+		writeLittleByte(wt, ms.Code)
+	}
 }
 
 func baseMeshMarshal(wt io.Writer, ms *BaseMesh, v uint32) {
 	MtlsMarshal(wt, ms.Materials, v)
 	MeshNodesMarshal(wt, ms.Nodes)
+	if v == V4 {
+		writeLittleByte(wt, ms.Code)
+	}
 }
 
 func MeshUnMarshal(rd io.Reader) *Mesh {
@@ -729,6 +737,9 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	readLittleByte(rd, &ms.Version)
 	ms.BaseMesh = *baseMeshUnMarshal(rd, ms.Version)
 	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
+	if ms.Version == V4 {
+		readLittleByte(rd, &ms.Code)
+	}
 	return &ms
 }
 
@@ -736,6 +747,9 @@ func baseMeshUnMarshal(rd io.Reader, v uint32) *BaseMesh {
 	ms := &BaseMesh{}
 	ms.Materials = MtlsUnMarshal(rd, v)
 	ms.Nodes = MeshNodesUnMarshal(rd)
+	if v == V4 {
+		readLittleByte(rd, &ms.Code)
+	}
 	return ms
 }
 
