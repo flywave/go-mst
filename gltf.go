@@ -405,12 +405,12 @@ func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Textur
 	doc.BufferViews = append(doc.BufferViews, imgBuffView)
 	doc.Images = append(doc.Images, gimg)
 
-	// var sp *gltf.Sampler
-	// if texture.Repeated {
-	sp := &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
-	// } else {
-	// 	sp = &gltf.Sampler{WrapS: gltf.WrapClampToEdge, WrapT: gltf.WrapClampToEdge}
-	// }
+	var sp *gltf.Sampler
+	if texture.Repeated {
+		sp = &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
+	} else {
+		sp = &gltf.Sampler{WrapS: gltf.WrapClampToEdge, WrapT: gltf.WrapClampToEdge}
+	}
 	doc.Samplers = append(doc.Samplers, sp)
 
 	return tx, nil
