@@ -387,7 +387,7 @@ func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Textur
 	imgIndex := uint32(len(doc.BufferViews))
 	gimg.BufferView = &imgIndex
 
-	img, e := LoadTexture(texture, false)
+	img, e := LoadTexture(texture, true)
 	if e != nil {
 		return nil, e
 	}
