@@ -901,7 +901,7 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 	return img, nil
 }
 
-func CreateTexture(name string, repet bool) (*Texture, error) {
+func CreateTexture(name string, repet, flipY bool) (*Texture, error) {
 	reader, err := os.Open(name)
 	if err != nil {
 		return nil, err
@@ -930,14 +930,23 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 
 	bd := img.Bounds()
 	buf1 := []byte{}
-	for y := 0; y < bd.Dy(); y++ {
-		for x := 0; x < bd.Dx(); x++ {
-			cl := img.At(x, y)
-			r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
-			buf1 = append(buf1, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(a&0xff))
+	if flipY {
+		for y := bd.Dy() - 1; y >= 0; y-- {
+			for x := 0; x < bd.Dx(); x++ {
+				cl := img.At(x, y)
+				r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
+				buf1 = append(buf1, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(a&0xff))
+			}
+		}
+	} else {
+		for y := 0; y < bd.Dy(); y++ {
+			for x := 0; x < bd.Dx(); x++ {
+				cl := img.At(x, y)
+				r, g, b, a := color.RGBAModel.Convert(cl).RGBA()
+				buf1 = append(buf1, byte(r&0xff), byte(g&0xff), byte(b&0xff), byte(a&0xff))
+			}
 		}
 	}
-
 	t := &Texture{}
 	_, fn := filepath.Split(name)
 	t.Name = fn
