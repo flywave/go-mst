@@ -491,6 +491,23 @@ func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
 				doc.Textures = append(doc.Textures, tex)
 			}
 		}
+
+		if texMtl != nil && texMtl.HasNormalTexture() {
+			if idx, ok := texMap[texMtl.Normal.Id]; ok {
+				gm.NormalTexture = &gltf.NormalTexture{Index: &idx}
+			} else {
+				normalTexIndex := uint32(len(doc.Textures))
+				texMap[texMtl.Normal.Id] = normalTexIndex
+				tex, err := buildTextureBuffer(doc, doc.Buffers[0], texMtl.Normal)
+
+				if err != nil {
+					return err
+				}
+				gm.NormalTexture = &gltf.NormalTexture{Index: &normalTexIndex}
+				doc.Textures = append(doc.Textures, tex)
+			}
+		}
+
 		gm.PBRMetallicRoughness.BaseColorFactor = cl
 
 		if gm.PBRMetallicRoughness.MetallicFactor == nil {

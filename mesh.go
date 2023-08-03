@@ -129,6 +129,14 @@ func (m *TextureMaterial) GetTexture() *Texture {
 	return m.Texture
 }
 
+func (m *TextureMaterial) HasNormalTexture() bool {
+	return m.Normal != nil
+}
+
+func (m *TextureMaterial) GetNormalTexture() *Texture {
+	return m.Normal
+}
+
 type PbrMaterial struct {
 	TextureMaterial
 	Emissive            [3]byte `json:"emissive"`
