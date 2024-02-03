@@ -1,7 +1,6 @@
 package mst
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -19,39 +18,6 @@ import (
 	"github.com/xtgo/uuid"
 )
 
-const absPath = "/home/hj/workspace/GISCore/build/public/Resources/"
-
-func TestToMst(t *testing.T) {
-	dirs := []string{"model/thsk/thsk_sw_xj"} //"anchormodel"
-	for _, d := range dirs {
-		dr := absPath + d
-		fs, _ := readDir(dr, dr, []string{".json"})
-		for _, f := range fs {
-			fpath := dr + f
-			mstPh := strings.Replace(fpath, ".json", ".mst", 1)
-			glbPh := strings.Replace(mstPh, ".mst", ".glb", 1)
-			// if info, err := os.Stat(mstPh); err == nil {
-			// 	t := time.Date(2021, time.November, 16, 12, 40, 0, 0, time.UTC)
-			// 	if info.ModTime().After(t) {
-			// 		continue
-			// 	}
-			// }
-			mh, _ := ThreejsBin2Mst(fpath)
-			for _, nd := range mh.Nodes {
-				nd.ReComputeNormal()
-			}
-			doc := CreateDoc()
-			BuildGltf(doc, mh, false)
-			bt, _ := GetGltfBinary(doc, 8)
-			ioutil.WriteFile(glbPh, bt, os.ModePerm)
-
-			wt := bytes.NewBuffer([]byte{})
-			MeshMarshal(wt, mh)
-			ioutil.WriteFile(mstPh, wt.Bytes(), os.ModePerm)
-		}
-	}
-}
-
 func TestGltf3(t *testing.T) {
 	f, _ := os.Open("./tests/aa74a4e312afeae291f11dabcb5098d3.mst")
 	mh := MeshUnMarshal(f)
@@ -60,32 +26,6 @@ func TestGltf3(t *testing.T) {
 	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("./tests/aa74a4e312afeae291f11dabcb5098d3.mst.glb", bt, os.ModePerm)
-}
-
-func TestGltf(t *testing.T) {
-	mesh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/public/HHRQQiTiWoLunLiuLiangJi/HHRQQiTiWoLunLiuLiangJi.json")
-	doc := CreateDoc()
-	BuildGltf(doc, mesh, false)
-	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/public/HHRQQiTiWoLunLiuLiangJi/HHRQQiTiWoLunLiuLiangJi.glb", bt, os.ModePerm)
-}
-
-func TestGltf2(t *testing.T) {
-	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.json")
-
-	doc := CreateDoc()
-	BuildGltf(doc, mh, false)
-	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/model/zbrl/ZBRL_BY/ZBRL_BY_1.glb", bt, os.ModePerm)
-}
-
-func TestBin2(t *testing.T) {
-	mh, _ := ThreejsBin2Mst("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.json")
-	doc := CreateDoc()
-	BuildGltf(doc, mh, false)
-	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.glb", bt, os.ModePerm)
-
 }
 
 func TestPipe2(t *testing.T) {
