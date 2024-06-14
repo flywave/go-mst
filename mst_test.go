@@ -23,7 +23,7 @@ func TestGltf3(t *testing.T) {
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
-	BuildGltf(doc, mh, false)
+	BuildGltf(doc, mh, false, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("./tests/aa74a4e312afeae291f11dabcb5098d3.mst.glb", bt, os.ModePerm)
 }
@@ -197,11 +197,10 @@ func TestPipe(t *testing.T) {
 }
 
 func TestMst2Gltf(t *testing.T) {
-	f, _ := os.Open("/home/hj/workspace/GISCore/build/public/Resources/model/thsk/thsk_sw_part1/thsk_ws_zhu.mst")
+	f, _ := os.Open("./tests/out_79_88_tower_0.mst")
 	mh := MeshUnMarshal(f)
-	mh.InstanceNode = nil
 	doc := CreateDoc()
-	BuildGltf(doc, mh, false)
+	BuildGltf(doc, mh, false, false)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("tests/TieGui_TWO.glb", bt, os.ModePerm)
+	ioutil.WriteFile("tests/out_79_88_tower_0.glb", bt, os.ModePerm)
 }

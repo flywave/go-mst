@@ -17,7 +17,7 @@ const GLTF_VERSION = "2.0"
 func MstToGltf(msts []*Mesh) (*gltf.Document, error) {
 	doc := CreateDoc()
 	for _, mst := range msts {
-		e := BuildGltf(doc, mst, false)
+		e := BuildGltf(doc, mst, false, true)
 		if e != nil {
 			return nil, e
 		}
@@ -28,7 +28,7 @@ func MstToGltf(msts []*Mesh) (*gltf.Document, error) {
 func MstToGltfWithOutline(msts []*Mesh) (*gltf.Document, error) {
 	doc := CreateDoc()
 	for _, mst := range msts {
-		e := BuildGltf(doc, mst, true)
+		e := BuildGltf(doc, mst, true, true)
 		if e != nil {
 			return nil, e
 		}
@@ -97,13 +97,13 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline bool) error {
-	err := buildGltf(doc, &mh.BaseMesh, nil, exportOutline)
+func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline, gpu_instance bool) error {
+	err := buildGltf(doc, &mh.BaseMesh, nil, exportOutline, gpu_instance)
 	if err != nil {
 		return err
 	}
 	for _, inst := range mh.InstanceNode {
-		buildGltf(doc, inst.Mesh, inst.Transfors, false)
+		buildGltf(doc, inst.Mesh, inst.Transfors, false, gpu_instance)
 	}
 
 	return nil
@@ -328,44 +328,49 @@ func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gl
 	return mesh, accessors
 }
 
-func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline bool) error {
+func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline bool, gpu_instance bool) error {
 	ctx := &buildContext{}
 	ctx.mtlSize = uint32(len(doc.Materials))
 
-	for _, nd := range mh.Nodes {
+	for _, mstNd := range mh.Nodes {
 		l := (uint32)(len(doc.Meshes))
+		if exportOutline && len(mstNd.EdgeGroup) > 0 {
+			doc.BufferViews = buildOutlineBuffer(ctx, doc.Buffers[0], doc.BufferViews, mstNd)
+
+			var mesh *gltf.Mesh
+			mesh, doc.Accessors = buildOutline(ctx, doc.Accessors, mstNd)
+			doc.Meshes = append(doc.Meshes, mesh)
+		} else {
+			doc.BufferViews = buildMeshBuffer(ctx, doc.Buffers[0], doc.BufferViews, mstNd)
+
+			var mesh *gltf.Mesh
+			mesh, doc.Accessors = buildMesh(ctx, doc.Accessors, mstNd)
+			doc.Meshes = append(doc.Meshes, mesh)
+		}
+
 		if trans == nil {
 			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
 			node := &gltf.Node{}
 			node.Mesh = &l
 			doc.Nodes = append(doc.Nodes, node)
 		} else {
-			for _, mt := range trans {
-				position, quat, scale := mat4d.Decompose(mt)
-				nd := gltf.Node{
-					Mesh:        &l,
-					Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
-					Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
-					Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
+			if gpu_instance {
+				buildInstance(doc, l, trans)
+			} else {
+				for _, mt := range trans {
+					position, quat, scale := mat4d.Decompose(mt)
+					nd := gltf.Node{
+						Mesh:        &l,
+						Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
+						Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
+						Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
+					}
+					doc.Nodes = append(doc.Nodes, &nd)
+					doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
 				}
-				doc.Nodes = append(doc.Nodes, &nd)
-				doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
 			}
 		}
 
-		if exportOutline && len(nd.EdgeGroup) > 0 {
-			doc.BufferViews = buildOutlineBuffer(ctx, doc.Buffers[0], doc.BufferViews, nd)
-
-			var mesh *gltf.Mesh
-			mesh, doc.Accessors = buildOutline(ctx, doc.Accessors, nd)
-			doc.Meshes = append(doc.Meshes, mesh)
-		} else {
-			doc.BufferViews = buildMeshBuffer(ctx, doc.Buffers[0], doc.BufferViews, nd)
-
-			var mesh *gltf.Mesh
-			mesh, doc.Accessors = buildMesh(ctx, doc.Accessors, nd)
-			doc.Meshes = append(doc.Meshes, mesh)
-		}
 	}
 
 	err := fillMaterials(doc, mh.Materials)
@@ -374,6 +379,73 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline
 	}
 
 	return nil
+}
+
+func buildInstance(doc *gltf.Document, l uint32, trans []*mat4d.T) {
+	count := len(trans)
+
+	bvIdx := uint32(len(doc.BufferViews))
+
+	posAccInx := len(doc.Accessors)
+	posAcc := &gltf.Accessor{}
+	posAcc.ComponentType = gltf.ComponentFloat
+	posAcc.Type = gltf.AccessorVec3
+	posAcc.Count = uint32(count)
+	posAcc.BufferView = &bvIdx
+	posAcc.ByteOffset = doc.Buffers[0].ByteLength
+	doc.Accessors = append(doc.Accessors, posAcc)
+
+	sclAcc := &gltf.Accessor{}
+	sclAcc.ComponentType = gltf.ComponentFloat
+	sclAcc.Type = gltf.AccessorVec3
+	sclAcc.Count = uint32(count)
+	sclAcc.BufferView = &bvIdx
+	sclAcc.ByteOffset = posAcc.ByteOffset + 12*uint32(count)
+	doc.Accessors = append(doc.Accessors, sclAcc)
+
+	rotAcc := &gltf.Accessor{}
+	rotAcc.ComponentType = gltf.ComponentFloat
+	rotAcc.Type = gltf.AccessorVec3
+	rotAcc.Count = uint32(count)
+	rotAcc.BufferView = &bvIdx
+	rotAcc.ByteOffset = sclAcc.ByteOffset + 12*uint32(count)
+	doc.Accessors = append(doc.Accessors, rotAcc)
+
+	buf := bytes.NewBuffer([]byte{})
+	var poss [][3]float32
+	var scls [][3]float32
+	var rots [][4]float32
+	for _, mt := range trans {
+		position, quat, scale := mat4d.Decompose(mt)
+		pos := [3]float32{float32(position[0]), float32(position[1]), float32(position[2])}
+		poss = append(poss, pos)
+		rot := [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])}
+		rots = append(rots, rot)
+		scl := [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])}
+		scls = append(scls, scl)
+
+		nd := gltf.Node{
+			Mesh: &l,
+			Extensions: map[string]interface{}{"EXT_mesh_gpu_instancing": map[string]interface{}{
+				"attributes": map[string]interface{}{
+					"TRANSLATION": posAccInx,
+					"SCALE":       posAccInx + 1,
+					"ROTATION":    posAccInx + 2,
+				},
+			}},
+		}
+		doc.Nodes = append(doc.Nodes, &nd)
+		doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
+	}
+
+	bv := &gltf.BufferView{}
+	bv.Buffer = 0
+	doc.BufferViews = append(doc.BufferViews, bv)
+
+	binary.Write(buf, binary.LittleEndian, poss)
+	binary.Write(buf, binary.LittleEndian, scls)
+	binary.Write(buf, binary.LittleEndian, rots)
+	doc.Buffers[0].Data = append(doc.Buffers[0].Data, buf.Bytes()...)
 }
 
 func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Texture) (*gltf.Texture, error) {
