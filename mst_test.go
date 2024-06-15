@@ -200,7 +200,7 @@ func TestMst2Gltf(t *testing.T) {
 	f, _ := os.Open("./tests/out_79_88_tower_0.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
-	BuildGltf(doc, mh, false, false)
+	BuildGltf(doc, mh, false, true)
 	bt, _ := GetGltfBinary(doc, 8)
 	ioutil.WriteFile("tests/out_79_88_tower_0.glb", bt, os.ModePerm)
 }
