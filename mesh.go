@@ -935,7 +935,13 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 	default:
 		return nil, errors.New("unknow format")
 	}
+	if err != nil {
+		return nil, err
+	}
+	return CreateTextureFromImage(img, name, repet)
+}
 
+func CreateTextureFromImage(img image.Image, name string, repet bool) (*Texture, error) {
 	bd := img.Bounds()
 	buf1 := []byte{}
 
@@ -954,5 +960,5 @@ func CreateTexture(name string, repet bool) (*Texture, error) {
 	t.Compressed = TEXTURE_COMPRESSED_ZLIB
 	t.Data = CompressImage(buf1)
 	t.Repeated = repet
-	return t, err
+	return t, nil
 }
