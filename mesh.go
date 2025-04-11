@@ -11,7 +11,6 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -863,7 +862,7 @@ func DecompressImage(src []byte) ([]byte, error) {
 	if er != nil {
 		return nil, er
 	}
-	return ioutil.ReadAll(r)
+	return io.ReadAll(r)
 }
 
 func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {

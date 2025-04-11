@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flywave/gltf"
 	proj "github.com/flywave/go-proj"
 	"github.com/flywave/go3d/float64/vec3"
 	fvec3 "github.com/flywave/go3d/vec3"
-	"github.com/qmuntal/gltf"
 	"github.com/xtgo/uuid"
 )
 

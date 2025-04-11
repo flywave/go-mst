@@ -6,10 +6,10 @@ import (
 	"image/png"
 	"io"
 
-	"github.com/qmuntal/gltf/ext/specular"
+	"github.com/flywave/gltf/ext/specular"
 
+	"github.com/flywave/gltf"
 	mat4d "github.com/flywave/go3d/float64/mat4"
-	"github.com/qmuntal/gltf"
 )
 
 const GLTF_VERSION = "2.0"
