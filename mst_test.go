@@ -5,7 +5,6 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,7 @@ func TestGltf3(t *testing.T) {
 	doc := CreateDoc()
 	BuildGltf(doc, mh, false, false)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("./tests/aa74a4e312afeae291f11dabcb5098d3.mst.glb", bt, os.ModePerm)
+	os.WriteFile("./tests/aa74a4e312afeae291f11dabcb5098d3.mst.glb", bt, os.ModePerm)
 }
 
 func TestPipe2(t *testing.T) {
@@ -202,5 +201,5 @@ func TestMst2Gltf(t *testing.T) {
 	doc := CreateDoc()
 	BuildGltf(doc, mh, false, true)
 	bt, _ := GetGltfBinary(doc, 8)
-	ioutil.WriteFile("tests/test1.glb", bt, os.ModePerm)
+	os.WriteFile("tests/test1.glb", bt, os.ModePerm)
 }
