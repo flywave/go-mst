@@ -353,6 +353,12 @@ func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline
 			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
 			node := &gltf.Node{}
 			node.Mesh = &l
+			if mstNd.Mat != nil {
+				position, quat, scale := mat4d.Decompose(mstNd.Mat)
+				node.Translation = [3]float32{float32(position[0]), float32(position[1]), float32(position[2])}
+				node.Rotation = [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])}
+				node.Scale = [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])}
+			}
 			doc.Nodes = append(doc.Nodes, node)
 		} else {
 			if gpu_instance {
