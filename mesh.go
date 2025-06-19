@@ -250,25 +250,21 @@ func (n *MeshNode) ReComputeNormal() {
 
 			cro := vec3.Cross(&sub1, &sub2)
 			l := cro.Length()
-			f.Normal = &f.Vertex
 			if l == 0 {
 				continue
 			}
 			weightedNormal := cro.Scale(1 / l)
 
-			n1 := &normals[f.Vertex[0]]
-			n1.Add(weightedNormal)
-			n1.Normalize()
-
-			n2 := &normals[f.Vertex[1]]
-			n2.Add(weightedNormal)
-			n2.Normalize()
-
-			n3 := &normals[f.Vertex[2]]
-			n3.Add(weightedNormal)
-			n3.Normalize()
+			normals[f.Vertex[0]].Add(weightedNormal)
+			normals[f.Vertex[1]].Add(weightedNormal)
+			normals[f.Vertex[2]].Add(weightedNormal)
 		}
 	}
+
+	for i := range normals {
+		normals[i].Normalize()
+	}
+
 	n.Normals = normals
 }
 
