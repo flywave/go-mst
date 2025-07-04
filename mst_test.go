@@ -22,7 +22,7 @@ func TestGltf3(t *testing.T) {
 	mh := MeshUnMarshal(f)
 	mh.InstanceNode = nil
 	doc := CreateDoc()
-	BuildGltf(doc, mh, false, false)
+	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	os.WriteFile("./tests/aa74a4e312afeae291f11dabcb5098d3.mst.glb", bt, os.ModePerm)
 }
@@ -199,7 +199,7 @@ func TestMst2Gltf(t *testing.T) {
 	f, _ := os.Open("./tests/test1.mst")
 	mh := MeshUnMarshal(f)
 	doc := CreateDoc()
-	BuildGltf(doc, mh, false, true)
+	BuildGltf(doc, mh, false)
 	bt, _ := GetGltfBinary(doc, 8)
 	os.WriteFile("tests/test1.glb", bt, os.ModePerm)
 }
