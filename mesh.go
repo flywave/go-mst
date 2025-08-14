@@ -16,8 +16,8 @@ import (
 	"path/filepath"
 
 	dmat "github.com/flywave/go3d/float64/mat4"
-
 	dvec3 "github.com/flywave/go3d/float64/vec3"
+
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 	"golang.org/x/image/bmp"
@@ -867,11 +867,12 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	data := tex.Data
 	var sz int
-	if tex.Format == TEXTURE_FORMAT_RGB {
+	switch tex.Format {
+	case TEXTURE_FORMAT_RGB:
 		sz = 3
-	} else if tex.Format == TEXTURE_FORMAT_RGBA {
+	case TEXTURE_FORMAT_RGBA:
 		sz = 4
-	} else if tex.Format == TEXTURE_FORMAT_R {
+	case TEXTURE_FORMAT_R:
 		sz = 1
 	}
 	var e error
@@ -886,11 +887,12 @@ func LoadTexture(tex *Texture, flipY bool) (image.Image, error) {
 		for j := 0; j < w; j++ {
 			p := i*w*sz + j*sz
 			var c color.NRGBA
-			if sz == 4 {
+			switch sz {
+			case 4:
 				c = color.NRGBA{R: data[p], G: data[p+1], B: data[p+2], A: data[p+3]}
-			} else if sz == 3 {
+			case 3:
 				c = color.NRGBA{R: data[p], G: data[p+1], B: data[p+2], A: 255}
-			} else if sz == 1 {
+			case 1:
 				c = color.NRGBA{R: data[p], G: data[p], B: data[p], A: 255}
 			}
 

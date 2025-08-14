@@ -10,10 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flywave/gltf"
 	proj "github.com/flywave/go-proj"
 	"github.com/flywave/go3d/float64/vec3"
-	fvec3 "github.com/flywave/go3d/vec3"
 	"github.com/xtgo/uuid"
 )
 
@@ -32,11 +30,6 @@ func TestPipe2(t *testing.T) {
 
 	id = strings.ReplaceAll(id, "-", "")
 	fmt.Println(id)
-}
-
-func TestDe(t *testing.T) {
-	gltf.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/psqitong.glb")
-	gltf.Open("/home/hj/workspace/GISCore/build/public/Resources/anchormodel/public/psqitong/qitong.glb")
 }
 
 func MstToObj(path, destName string) {
@@ -173,26 +166,6 @@ func TestVec(t *testing.T) {
 	world.Add(head)
 	x, y, z, _ := proj.Ecef2Lonlat(p[0], p[1], p[2])
 	fmt.Println(x, y, z)
-}
-
-func TestPipe(t *testing.T) {
-	pos := []*fvec3.T{
-		{-45.6055285647, 197.900406907, 631.169545605},
-		{-55.3296683, 217.775199322, 601.643433287},
-		{-57.99762254, 223.04394682, 593.7597909383},
-	}
-	lines := []string{"/home/hj/workspace/GISCore/build/temp/mst/yanshi/ys_zq_mdb/line/1.mst", "/home/hj/workspace/GISCore/build/temp/mst/yanshi/ys_zq_mdb/line/2.mst", "/home/hj/workspace/GISCore/build/temp/mst/yanshi/ys_zq_mdb/line/3.mst"}
-	lines2 := []string{"tests/0.mst", "tests/1.mst", "tests/2.mst"}
-	for i := 0; i < 3; i++ {
-		ms, _ := MeshReadFrom(lines[i])
-		for _, nd := range ms.Nodes {
-			for k := range nd.Vertices {
-				nd.Vertices[k].Add(pos[i])
-			}
-		}
-		MeshWriteTo(lines2[i], ms)
-		MstToObj(lines2[i], fmt.Sprintf("%d", i))
-	}
 }
 
 func TestMst2Gltf(t *testing.T) {

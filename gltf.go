@@ -6,189 +6,196 @@ import (
 	"image/png"
 	"io"
 
-	"github.com/flywave/gltf/ext/specular"
-
 	"github.com/flywave/gltf"
+	"github.com/flywave/gltf/ext/specular"
 	mat4d "github.com/flywave/go3d/float64/mat4"
 )
 
-const GLTF_VERSION = "2.0"
+const (
+	// GLTFVersion 定义GLTF规范版本
+	GLTFVersion = "2.0"
 
-func MstToGltf(msts []*Mesh) (*gltf.Document, error) {
+	// PaddingChar 用于二进制填充的字符
+	PaddingChar = 0x20
+)
+
+// MstToGltf 将MST网格转换为GLTF文档
+func MstToGltf(meshes []*Mesh) (*gltf.Document, error) {
 	doc := CreateDoc()
-	for _, mst := range msts {
-		e := BuildGltf(doc, mst, false)
-		if e != nil {
-			return nil, e
+	for _, mesh := range meshes {
+		if err := BuildGltf(doc, mesh, false); err != nil {
+			return nil, err
 		}
 	}
 	return doc, nil
 }
 
-func MstToGltfWithOutline(msts []*Mesh) (*gltf.Document, error) {
+// MstToGltfWithOutline 将MST网格转换为GLTF文档并包含轮廓线
+func MstToGltfWithOutline(meshes []*Mesh) (*gltf.Document, error) {
 	doc := CreateDoc()
-	for _, mst := range msts {
-		e := BuildGltf(doc, mst, true)
-		if e != nil {
-			return nil, e
+	for _, mesh := range meshes {
+		if err := BuildGltf(doc, mesh, true); err != nil {
+			return nil, err
 		}
 	}
 	return doc, nil
 }
+
+// CreateDoc 创建一个新的GLTF文档
 func CreateDoc() *gltf.Document {
-	doc := &gltf.Document{}
-	doc.Asset.Version = GLTF_VERSION
-	srcIndex := uint32(0)
-	doc.Scene = &srcIndex
-	doc.Scenes = append(doc.Scenes, &gltf.Scene{})
-	doc.Buffers = append(doc.Buffers, &gltf.Buffer{})
+	doc := &gltf.Document{
+		Asset: gltf.Asset{
+			Version: GLTFVersion,
+		},
+		Scenes:  []*gltf.Scene{{}},
+		Buffers: []*gltf.Buffer{{}},
+	}
+	
+	sceneIndex := uint32(0)
+	doc.Scene = &sceneIndex
+	
 	return doc
 }
 
-type calcSizeWriter struct {
+// bufferWriter 用于计算缓冲区大小的写入器
+type bufferWriter struct {
 	writer io.Writer
-	Size   int
+	size   int
 }
 
-func (w *calcSizeWriter) Write(p []byte) (n int, err error) {
-	si := len(p)
+func (w *bufferWriter) Write(p []byte) (int, error) {
+	n := len(p)
 	w.writer.Write(p)
-	w.Size += int(si)
-	return si, nil
+	w.size += n
+	return n, nil
 }
 
-func (w *calcSizeWriter) Bytes() []byte {
+func (w *bufferWriter) Bytes() []byte {
 	return w.writer.(*bytes.Buffer).Bytes()
 }
 
-func (w *calcSizeWriter) GetSize() int {
+func (w *bufferWriter) Size() int {
 	return len(w.Bytes())
 }
 
-func newSizeWriter() calcSizeWriter {
-	wt := bytes.NewBuffer([]byte{})
-	return calcSizeWriter{Size: int(0), writer: wt}
+func newBufferWriter() *bufferWriter {
+	return &bufferWriter{
+		writer: bytes.NewBuffer(nil),
+		size:   0,
+	}
 }
 
-func calcPadding(offset, paddingUnit int) int {
-	padding := offset % paddingUnit
+// calcPadding 计算需要的填充字节数
+func calcPadding(offset, unit int) int {
+	padding := offset % unit
 	if padding != 0 {
-		padding = paddingUnit - padding
+		padding = unit - padding
 	}
 	return padding
 }
 
+// GetGltfBinary 将GLTF文档编码为二进制格式
 func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
-	w := newSizeWriter()
-	enc := gltf.NewEncoder(w.writer)
-	enc.AsBinary = true
-	if err := enc.Encode(doc); err != nil {
+	writer := newBufferWriter()
+
+	encoder := gltf.NewEncoder(writer.writer)
+	encoder.AsBinary = true
+
+	if err := encoder.Encode(doc); err != nil {
 		return nil, err
 	}
-	padding := calcPadding(w.Size, paddingUnit)
+
+	padding := calcPadding(writer.size, paddingUnit)
 	if padding == 0 {
-		return w.Bytes(), nil
+		return writer.Bytes(), nil
 	}
-	pad := make([]byte, padding)
-	for i := range pad {
-		pad[i] = 0x20
-	}
-	w.Write(pad)
-	return w.Bytes(), nil
+
+	pad := bytes.Repeat([]byte{PaddingChar}, padding)
+	writer.Write(pad)
+
+	return writer.Bytes(), nil
 }
 
-func BuildGltf(doc *gltf.Document, mh *Mesh, exportOutline bool) error {
-	err := buildGltf(doc, &mh.BaseMesh, nil, exportOutline)
-	if err != nil {
+// BuildGltf 构建GLTF文档
+func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
+	if err := buildGltfFromBaseMesh(doc, &mesh.BaseMesh, nil, exportOutline); err != nil {
 		return err
 	}
-	for _, inst := range mh.InstanceNode {
-		buildGltf(doc, inst.Mesh, inst.Transfors, false)
+
+	for _, instance := range mesh.InstanceNode {
+		if err := buildGltfFromBaseMesh(doc, instance.Mesh, instance.Transfors, false); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
+// buildContext 构建上下文，存储构建过程中的状态
 type buildContext struct {
 	mtlSize uint32
+
+	// 缓冲区视图索引
 	bvIndex uint32
 	bvPos   uint32
 	bvTex   uint32
 	bvNorm  uint32
 }
 
-func buildMeshBuffer(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, nd *MeshNode) []*gltf.BufferView {
-	var bt []byte
-	buf := bytes.NewBuffer(bt)
+// buildMeshBufferViews 构建网格的缓冲区视图
+func buildMeshBufferViews(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, node *MeshNode) []*gltf.BufferView {
+	buf := bytes.NewBuffer(nil)
+
 	ctx.bvIndex = uint32(len(bufferViews))
-	indecs := &gltf.BufferView{}
-	startLen := buffer.ByteLength
-	indecs.ByteOffset = startLen
-	for _, g := range nd.FaceGroup {
-		for _, f := range g.Faces {
-			binary.Write(buf, binary.LittleEndian, f.Vertex)
+
+	// 索引数据
+	indicesView := &gltf.BufferView{
+		ByteOffset: buffer.ByteLength,
+		Buffer:     0,
+	}
+
+	for _, group := range node.FaceGroup {
+		for _, face := range group.Faces {
+			binary.Write(buf, binary.LittleEndian, face.Vertex)
 		}
 	}
-	indecs.ByteLength = uint32(buf.Len())
-	indecs.Buffer = 0
-	bufferViews = append(bufferViews, indecs)
 
-	postions := &gltf.BufferView{}
-	postions.ByteOffset = uint32(buf.Len()) + startLen
-	binary.Write(buf, binary.LittleEndian, nd.Vertices)
-	postions.ByteLength = uint32(buf.Len()) - postions.ByteOffset + startLen
-	postions.Buffer = 0
+	indicesView.ByteLength = uint32(buf.Len())
+	bufferViews = append(bufferViews, indicesView)
+
+	// 顶点位置数据
+	positionsView := &gltf.BufferView{
+		ByteOffset: uint32(buf.Len()) + buffer.ByteLength,
+		Buffer:     0,
+	}
+	binary.Write(buf, binary.LittleEndian, node.Vertices)
+	positionsView.ByteLength = uint32(buf.Len()) - positionsView.ByteOffset + buffer.ByteLength
 	ctx.bvPos = uint32(len(bufferViews))
-	bufferViews = append(bufferViews, postions)
+	bufferViews = append(bufferViews, positionsView)
 
-	texcood := &gltf.BufferView{}
-	ctx.bvTex = uint32(len(bufferViews))
-	if len(nd.TexCoords) > 0 {
-		texcood.ByteOffset = uint32(buf.Len()) + startLen
-		binary.Write(buf, binary.LittleEndian, nd.TexCoords)
-		texcood.ByteLength = uint32(buf.Len()) - texcood.ByteOffset + startLen
-		texcood.Buffer = 0
-		bufferViews = append(bufferViews, texcood)
-	}
-
-	normalView := &gltf.BufferView{}
-	ctx.bvNorm = uint32(len(bufferViews))
-	if len(nd.Normals) > 0 {
-		normalView.ByteOffset = uint32(buf.Len()) + startLen
-		binary.Write(buf, binary.LittleEndian, nd.Normals)
-		normalView.ByteLength = uint32(buf.Len()) - normalView.ByteOffset + startLen
-		normalView.Buffer = 0
-		bufferViews = append(bufferViews, normalView)
-	}
-	buffer.ByteLength += uint32(buf.Len())
-	buffer.Data = append(buffer.Data, buf.Bytes()...)
-
-	return bufferViews
-}
-
-func buildOutlineBuffer(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, nd *MeshNode) []*gltf.BufferView {
-	var bt []byte
-	buf := bytes.NewBuffer(bt)
-	ctx.bvIndex = uint32(len(bufferViews))
-	indecs := &gltf.BufferView{}
-	startLen := buffer.ByteLength
-	indecs.ByteOffset = startLen
-	for _, g := range nd.EdgeGroup {
-		for _, f := range g.Edges {
-			binary.Write(buf, binary.LittleEndian, f)
+	// 纹理坐标数据
+	if len(node.TexCoords) > 0 {
+		texCoordsView := &gltf.BufferView{
+			ByteOffset: uint32(buf.Len()) + buffer.ByteLength,
+			Buffer:     0,
 		}
+		binary.Write(buf, binary.LittleEndian, node.TexCoords)
+		texCoordsView.ByteLength = uint32(buf.Len()) - texCoordsView.ByteOffset + buffer.ByteLength
+		ctx.bvTex = uint32(len(bufferViews))
+		bufferViews = append(bufferViews, texCoordsView)
 	}
-	indecs.ByteLength = uint32(buf.Len())
-	indecs.Buffer = 0
-	bufferViews = append(bufferViews, indecs)
 
-	postions := &gltf.BufferView{}
-	postions.ByteOffset = uint32(buf.Len()) + startLen
-	binary.Write(buf, binary.LittleEndian, nd.Vertices)
-	postions.ByteLength = uint32(buf.Len()) - postions.ByteOffset + startLen
-	postions.Buffer = 0
-	ctx.bvPos = uint32(len(bufferViews))
-	bufferViews = append(bufferViews, postions)
+	// 法线数据
+	if len(node.Normals) > 0 {
+		normalsView := &gltf.BufferView{
+			ByteOffset: uint32(buf.Len()) + buffer.ByteLength,
+			Buffer:     0,
+		}
+		binary.Write(buf, binary.LittleEndian, node.Normals)
+		normalsView.ByteLength = uint32(buf.Len()) - normalsView.ByteOffset + buffer.ByteLength
+		ctx.bvNorm = uint32(len(bufferViews))
+		bufferViews = append(bufferViews, normalsView)
+	}
 
 	buffer.ByteLength += uint32(buf.Len())
 	buffer.Data = append(buffer.Data, buf.Bytes()...)
@@ -196,351 +203,487 @@ func buildOutlineBuffer(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*g
 	return bufferViews
 }
 
-func buildOutline(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gltf.Mesh, []*gltf.Accessor) {
-	mesh := &gltf.Mesh{}
-	aftIndices := uint32(len(nd.EdgeGroup))
-	idx := uint32(len(accessors))
-	indexPos := aftIndices + idx
-	var start uint32 = 0
-	for i := range nd.EdgeGroup {
-		patch := nd.EdgeGroup[i]
-		batchId := patch.Batchid
-		if batchId < 0 {
-			batchId = 0
-		}
-		mtl_id := uint32(batchId) + ctx.mtlSize
+// buildOutlineBufferViews 构建轮廓线的缓冲区视图
+func buildOutlineBufferViews(ctx *buildContext, buffer *gltf.Buffer, bufferViews []*gltf.BufferView, node *MeshNode) []*gltf.BufferView {
+	buf := bytes.NewBuffer(nil)
 
-		ps := &gltf.Primitive{}
-		ps.Material = &mtl_id
-		if ps.Attributes == nil {
-			ps.Attributes = make(gltf.Attribute)
-		}
-		index := uint32(i) + idx
-		ps.Indices = &index
+	ctx.bvIndex = uint32(len(bufferViews))
 
-		ps.Attributes["POSITION"] = indexPos
-
-		ps.Mode = gltf.PrimitiveLineStrip
-		mesh.Primitives = append(mesh.Primitives, ps)
-
-		indexacc := &gltf.Accessor{}
-		indexacc.ComponentType = gltf.ComponentUint
-
-		indexacc.ByteOffset = start * 8
-		indexacc.Count = uint32(len(patch.Edges)) * 2
-
-		start += uint32(len(patch.Edges))
-		bfindex := ctx.bvIndex
-		indexacc.BufferView = &bfindex
-		accessors = append(accessors, indexacc)
+	// 索引数据
+	indicesView := &gltf.BufferView{
+		ByteOffset: buffer.ByteLength,
+		Buffer:     0,
 	}
 
-	posacc := &gltf.Accessor{}
-	posacc.ComponentType = gltf.ComponentFloat
-	posacc.Type = gltf.AccessorVec3
-	posacc.Count = uint32(len(nd.Vertices))
+	for _, group := range node.EdgeGroup {
+		for _, edge := range group.Edges {
+			binary.Write(buf, binary.LittleEndian, edge)
+		}
+	}
 
-	posacc.BufferView = &ctx.bvPos
-	box := nd.GetBoundbox()
-	posacc.Min = []float32{float32(box[0]), float32(box[1]), float32(box[2])}
-	posacc.Max = []float32{float32(box[3]), float32(box[4]), float32(box[5])}
-	accessors = append(accessors, posacc)
+	indicesView.ByteLength = uint32(buf.Len())
+	bufferViews = append(bufferViews, indicesView)
+
+	// 顶点位置数据
+	positionsView := &gltf.BufferView{
+		ByteOffset: uint32(buf.Len()) + buffer.ByteLength,
+		Buffer:     0,
+	}
+	binary.Write(buf, binary.LittleEndian, node.Vertices)
+	positionsView.ByteLength = uint32(buf.Len()) - positionsView.ByteOffset + buffer.ByteLength
+	ctx.bvPos = uint32(len(bufferViews))
+	bufferViews = append(bufferViews, positionsView)
+
+	buffer.ByteLength += uint32(buf.Len())
+	buffer.Data = append(buffer.Data, buf.Bytes()...)
+
+	return bufferViews
+}
+
+// buildOutlineMesh 构建轮廓线网格
+func buildOutlineMesh(ctx *buildContext, accessors []*gltf.Accessor, node *MeshNode) (*gltf.Mesh, []*gltf.Accessor) {
+	mesh := &gltf.Mesh{}
+
+	accessorOffset := uint32(len(accessors))
+	positionAccessorIndex := uint32(len(node.EdgeGroup)) + accessorOffset
+
+	var startOffset uint32 = 0
+
+	for i, group := range node.EdgeGroup {
+		batchID := group.Batchid
+		if batchID < 0 {
+			batchID = 0
+		}
+
+		materialID := uint32(batchID) + ctx.mtlSize
+
+		primitive := &gltf.Primitive{
+			Material: &materialID,
+			Indices:  uint32Ptr(uint32(i) + accessorOffset),
+			Mode:     gltf.PrimitiveLineStrip,
+			Attributes: gltf.Attribute{
+				"POSITION": positionAccessorIndex,
+			},
+		}
+
+		mesh.Primitives = append(mesh.Primitives, primitive)
+
+		// 索引访问器
+		indexAccessor := &gltf.Accessor{
+			ComponentType: gltf.ComponentUint,
+			ByteOffset:    startOffset * 8,
+			Count:         uint32(len(group.Edges)) * 2,
+			BufferView:    uint32Ptr(ctx.bvIndex),
+		}
+
+		accessors = append(accessors, indexAccessor)
+		startOffset += uint32(len(group.Edges))
+	}
+
+	// 位置访问器
+	bounds := node.GetBoundbox()
+	positionAccessor := &gltf.Accessor{
+		ComponentType: gltf.ComponentFloat,
+		Type:          gltf.AccessorVec3,
+		Count:         uint32(len(node.Vertices)),
+		BufferView:    uint32Ptr(ctx.bvPos),
+		Min:           []float32{float32(bounds[0]), float32(bounds[1]), float32(bounds[2])},
+		Max:           []float32{float32(bounds[3]), float32(bounds[4]), float32(bounds[5])},
+	}
+	accessors = append(accessors, positionAccessor)
 
 	return mesh, accessors
 }
 
-func buildMesh(ctx *buildContext, accessors []*gltf.Accessor, nd *MeshNode) (*gltf.Mesh, []*gltf.Accessor) {
+// buildMeshPrimitives 构建网格图元
+func buildMeshPrimitives(ctx *buildContext, accessors []*gltf.Accessor, node *MeshNode) (*gltf.Mesh, []*gltf.Accessor) {
 	mesh := &gltf.Mesh{}
-	aftIndices := uint32(len(nd.FaceGroup))
-	idx := uint32(len(accessors))
-	indexPos := aftIndices + idx
-	var start uint32 = 0
 
-	for i := range nd.FaceGroup {
-		tmp := indexPos
-		patch := nd.FaceGroup[i]
-		batchId := patch.Batchid
-		if batchId < 0 {
-			batchId = 0
-		}
-		mtl_id := uint32(batchId) + ctx.mtlSize
+	accessorOffset := uint32(len(accessors))
+	positionAccessorIndex := uint32(len(node.FaceGroup)) + accessorOffset
 
-		ps := &gltf.Primitive{}
-		ps.Material = &mtl_id
-		if ps.Attributes == nil {
-			ps.Attributes = make(gltf.Attribute)
-		}
-		index := uint32(i) + idx
-		ps.Indices = &index
+	var startOffset uint32 = 0
 
-		ps.Attributes["POSITION"] = indexPos
-		if len(nd.TexCoords) > 0 {
-			tmp++
-			ps.Attributes["TEXCOORD_0"] = tmp
+	for i, group := range node.FaceGroup {
+		batchID := group.Batchid
+		if batchID < 0 {
+			batchID = 0
 		}
-		if len(nd.Normals) > 0 {
-			tmp++
-			ps.Attributes["NORMAL"] = tmp
-		}
-		ps.Mode = gltf.PrimitiveTriangles
-		mesh.Primitives = append(mesh.Primitives, ps)
 
-		indexacc := &gltf.Accessor{}
-		indexacc.ComponentType = gltf.ComponentUint
-		indexacc.ByteOffset = start * 12
-		indexacc.Count = uint32(len(patch.Faces)) * 3
-		start += uint32(len(patch.Faces))
-		bfindex := ctx.bvIndex
-		indexacc.BufferView = &bfindex
-		accessors = append(accessors, indexacc)
+		materialID := uint32(batchID) + ctx.mtlSize
+
+		// 计算属性索引
+		attributeIndex := positionAccessorIndex
+		attributes := gltf.Attribute{"POSITION": attributeIndex}
+
+		if len(node.TexCoords) > 0 {
+			attributeIndex++
+			attributes["TEXCOORD_0"] = attributeIndex
+		}
+
+		if len(node.Normals) > 0 {
+			attributeIndex++
+			attributes["NORMAL"] = attributeIndex
+		}
+
+		primitive := &gltf.Primitive{
+			Material:   &materialID,
+			Indices:    uint32Ptr(uint32(i) + accessorOffset),
+			Mode:       gltf.PrimitiveTriangles,
+			Attributes: attributes,
+		}
+
+		mesh.Primitives = append(mesh.Primitives, primitive)
+
+		// 索引访问器
+		indexAccessor := &gltf.Accessor{
+			ComponentType: gltf.ComponentUint,
+			ByteOffset:    startOffset * 12,
+			Count:         uint32(len(group.Faces)) * 3,
+			BufferView:    uint32Ptr(ctx.bvIndex),
+		}
+
+		accessors = append(accessors, indexAccessor)
+		startOffset += uint32(len(group.Faces))
 	}
 
-	posacc := &gltf.Accessor{}
-	posacc.ComponentType = gltf.ComponentFloat
-	posacc.Type = gltf.AccessorVec3
-	posacc.Count = uint32(len(nd.Vertices))
+	// 位置访问器
+	bounds := node.GetBoundbox()
+	positionAccessor := &gltf.Accessor{
+		ComponentType: gltf.ComponentFloat,
+		Type:          gltf.AccessorVec3,
+		Count:         uint32(len(node.Vertices)),
+		BufferView:    uint32Ptr(ctx.bvPos),
+		Min:           []float32{float32(bounds[0]), float32(bounds[1]), float32(bounds[2])},
+		Max:           []float32{float32(bounds[3]), float32(bounds[4]), float32(bounds[5])},
+	}
+	accessors = append(accessors, positionAccessor)
 
-	bvPos := ctx.bvPos
-	posacc.BufferView = &bvPos
-	box := nd.GetBoundbox()
-	posacc.Min = []float32{float32(box[0]), float32(box[1]), float32(box[2])}
-	posacc.Max = []float32{float32(box[3]), float32(box[4]), float32(box[5])}
-	accessors = append(accessors, posacc)
-
-	if len(nd.TexCoords) > 0 {
-		texacc := &gltf.Accessor{}
-		texacc.ComponentType = gltf.ComponentFloat
-		texacc.Type = gltf.AccessorVec2
-		texacc.Count = uint32(len(nd.TexCoords))
-		bvTex := ctx.bvTex
-		texacc.BufferView = &bvTex
-		accessors = append(accessors, texacc)
+	// 纹理坐标访问器
+	if len(node.TexCoords) > 0 {
+		texCoordAccessor := &gltf.Accessor{
+			ComponentType: gltf.ComponentFloat,
+			Type:          gltf.AccessorVec2,
+			Count:         uint32(len(node.TexCoords)),
+			BufferView:    uint32Ptr(ctx.bvTex),
+		}
+		accessors = append(accessors, texCoordAccessor)
 	}
 
-	if len(nd.Normals) > 0 {
-		nlacc := &gltf.Accessor{}
-		nlacc.ComponentType = gltf.ComponentFloat
-		nlacc.Type = gltf.AccessorVec3
-		nlacc.Count = uint32(len(nd.Normals))
-		bvNorm := ctx.bvNorm
-		nlacc.BufferView = &bvNorm
-		accessors = append(accessors, nlacc)
+	// 法线访问器
+	if len(node.Normals) > 0 {
+		normalAccessor := &gltf.Accessor{
+			ComponentType: gltf.ComponentFloat,
+			Type:          gltf.AccessorVec3,
+			Count:         uint32(len(node.Normals)),
+			BufferView:    uint32Ptr(ctx.bvNorm),
+		}
+		accessors = append(accessors, normalAccessor)
 	}
+
 	return mesh, accessors
 }
 
-func buildGltf(doc *gltf.Document, mh *BaseMesh, trans []*mat4d.T, exportOutline bool) error {
-	ctx := &buildContext{}
-	ctx.mtlSize = uint32(len(doc.Materials))
+// buildGltfFromBaseMesh 从基础网格构建GLTF
+func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat4d.T, exportOutline bool) error {
+	ctx := &buildContext{
+		mtlSize: uint32(len(doc.Materials)),
+	}
 
-	for _, mstNd := range mh.Nodes {
-		l := (uint32)(len(doc.Meshes))
-		if exportOutline && len(mstNd.EdgeGroup) > 0 {
-			doc.BufferViews = buildOutlineBuffer(ctx, doc.Buffers[0], doc.BufferViews, mstNd)
+	for _, node := range mesh.Nodes {
+		meshIndex := uint32(len(doc.Meshes))
 
-			var mesh *gltf.Mesh
-			mesh, doc.Accessors = buildOutline(ctx, doc.Accessors, mstNd)
-			doc.Meshes = append(doc.Meshes, mesh)
+		if exportOutline && len(node.EdgeGroup) > 0 {
+			doc.BufferViews = buildOutlineBufferViews(ctx, doc.Buffers[0], doc.BufferViews, node)
+
+			outlineMesh, accessors := buildOutlineMesh(ctx, doc.Accessors, node)
+			doc.Meshes = append(doc.Meshes, outlineMesh)
+			doc.Accessors = accessors
 		} else {
-			doc.BufferViews = buildMeshBuffer(ctx, doc.Buffers[0], doc.BufferViews, mstNd)
+			doc.BufferViews = buildMeshBufferViews(ctx, doc.Buffers[0], doc.BufferViews, node)
 
-			var mesh *gltf.Mesh
-			mesh, doc.Accessors = buildMesh(ctx, doc.Accessors, mstNd)
+			mesh, accessors := buildMeshPrimitives(ctx, doc.Accessors, node)
 			doc.Meshes = append(doc.Meshes, mesh)
+			doc.Accessors = accessors
 		}
 
-		if trans == nil {
-			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)))
-			node := &gltf.Node{}
-			node.Mesh = &l
-			if mstNd.Mat != nil {
-				position, quat, scale := mat4d.Decompose(mstNd.Mat)
-				node.Translation = [3]float32{float32(position[0]), float32(position[1]), float32(position[2])}
-				node.Rotation = [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])}
-				node.Scale = [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])}
+		if transforms == nil {
+			// 无变换矩阵，直接添加节点
+			nodeIndex := uint32(len(doc.Nodes))
+			gltfNode := &gltf.Node{Mesh: &meshIndex}
+
+			if node.Mat != nil {
+				position, rotation, scale := mat4d.Decompose(node.Mat)
+				gltfNode.Translation = [3]float32{float32(position[0]), float32(position[1]), float32(position[2])}
+				gltfNode.Rotation = [4]float32{float32(rotation[0]), float32(rotation[1]), float32(rotation[2]), float32(rotation[3])}
+				gltfNode.Scale = [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])}
 			}
-			doc.Nodes = append(doc.Nodes, node)
+
+			doc.Nodes = append(doc.Nodes, gltfNode)
+			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, nodeIndex)
 		} else {
-			for _, mt := range trans {
-				position, quat, scale := mat4d.Decompose(mt)
-				nd := gltf.Node{
-					Mesh:        &l,
+			// 应用变换矩阵
+			for _, transform := range transforms {
+				position, rotation, scale := mat4d.Decompose(transform)
+				gltfNode := &gltf.Node{
+					Mesh:        &meshIndex,
 					Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
-					Rotation:    [4]float32{float32(quat[0]), float32(quat[1]), float32(quat[2]), float32(quat[3])},
+					Rotation:    [4]float32{float32(rotation[0]), float32(rotation[1]), float32(rotation[2]), float32(rotation[3])},
 					Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
 				}
-				doc.Nodes = append(doc.Nodes, &nd)
+
+				doc.Nodes = append(doc.Nodes, gltfNode)
 				doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
 			}
 		}
-
 	}
 
-	err := fillMaterials(doc, mh.Materials)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return fillMaterials(doc, mesh.Materials)
 }
 
-func buildTextureBuffer(doc *gltf.Document, buffer *gltf.Buffer, texture *Texture) (*gltf.Texture, error) {
-	spCount := uint32(len(doc.Samplers))
-	imCount := uint32(len(doc.Images))
+// buildTexture 构建纹理
+func buildTexture(doc *gltf.Document, buffer *gltf.Buffer, texture *Texture) (*gltf.Texture, error) {
+	samplerIndex := uint32(len(doc.Samplers))
+	imageIndex := uint32(len(doc.Images))
 
-	tx := &gltf.Texture{Sampler: &spCount, Source: &imCount}
-
-	gimg := &gltf.Image{}
-	gimg.MimeType = "image/png"
-	imgIndex := uint32(len(doc.BufferViews))
-	gimg.BufferView = &imgIndex
-
-	img, e := LoadTexture(texture, true)
-	if e != nil {
-		return nil, e
+	gltfTexture := &gltf.Texture{
+		Sampler: &samplerIndex,
+		Source:  &imageIndex,
 	}
-	var bt []byte
-	buf := bytes.NewBuffer(bt)
-	png.Encode(buf, img)
 
-	imgBuffView := &gltf.BufferView{}
-	imgBuffView.ByteOffset = buffer.ByteLength
-	imgBuffView.ByteLength = uint32(buf.Len())
-	imgBuffView.Buffer = 0
+	// 加载图像
+	img, err := LoadTexture(texture, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// 编码PNG
+	buf := bytes.NewBuffer(nil)
+	if err := png.Encode(buf, img); err != nil {
+		return nil, err
+	}
+
+	// 创建缓冲区视图
+	bufferViewIndex := uint32(len(doc.BufferViews))
+	bufferView := &gltf.BufferView{
+		ByteOffset: buffer.ByteLength,
+		ByteLength: uint32(buf.Len()),
+		Buffer:     0,
+	}
+
 	buffer.ByteLength += uint32(buf.Len())
 	buffer.Data = append(buffer.Data, buf.Bytes()...)
+	doc.BufferViews = append(doc.BufferViews, bufferView)
 
-	doc.BufferViews = append(doc.BufferViews, imgBuffView)
-	doc.Images = append(doc.Images, gimg)
-
-	var sp *gltf.Sampler
-	if texture.Repeated {
-		sp = &gltf.Sampler{WrapS: gltf.WrapRepeat, WrapT: gltf.WrapRepeat}
-	} else {
-		sp = &gltf.Sampler{WrapS: gltf.WrapClampToEdge, WrapT: gltf.WrapClampToEdge}
+	// 创建图像
+	gltfImage := &gltf.Image{
+		MimeType:   "image/png",
+		BufferView: &bufferViewIndex,
 	}
-	doc.Samplers = append(doc.Samplers, sp)
+	doc.Images = append(doc.Images, gltfImage)
 
-	return tx, nil
+	// 创建采样器
+	var sampler *gltf.Sampler
+	if texture.Repeated {
+		sampler = &gltf.Sampler{
+			WrapS: gltf.WrapRepeat,
+			WrapT: gltf.WrapRepeat,
+		}
+	} else {
+		sampler = &gltf.Sampler{
+			WrapS: gltf.WrapClampToEdge,
+			WrapT: gltf.WrapClampToEdge,
+		}
+	}
+	doc.Samplers = append(doc.Samplers, sampler)
+
+	return gltfTexture, nil
 }
 
-func fillMaterials(doc *gltf.Document, mts []MeshMaterial) error {
-	texMap := make(map[int32]uint32)
+// fillMaterials 填充材质数据
+func fillMaterials(doc *gltf.Document, materials []MeshMaterial) error {
+	textureMap := make(map[int32]uint32)
 	useExtension := false
-	for i := range mts {
-		mtl := mts[i]
 
-		gm := &gltf.Material{DoubleSided: true, AlphaMode: gltf.AlphaMask}
-		gm.PBRMetallicRoughness = &gltf.PBRMetallicRoughness{BaseColorFactor: &[4]float32{1, 1, 1, 1}}
-		gm.Extensions = make(map[string]interface{})
-		var texMtl *TextureMaterial
-		var cl *[4]float32
-		switch ml := mtl.(type) {
+	for _, material := range materials {
+		gltfMaterial := &gltf.Material{
+			DoubleSided: true,
+			AlphaMode:   gltf.AlphaMask,
+			PBRMetallicRoughness: &gltf.PBRMetallicRoughness{
+				BaseColorFactor: &[4]float32{1, 1, 1, 1},
+			},
+			Extensions: make(map[string]interface{}),
+		}
+
+		var textureMaterial *TextureMaterial
+		var baseColor *[4]float32
+
+		switch mtl := material.(type) {
 		case *BaseMaterial:
-			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
+			baseColor = &[4]float32{
+				float32(mtl.Color[0]) / 255,
+				float32(mtl.Color[1]) / 255,
+				float32(mtl.Color[2]) / 255,
+				1 - float32(mtl.Transparency),
+			}
+
 		case *PbrMaterial:
-			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
-			mc := float32(ml.Metallic)
-			gm.PBRMetallicRoughness.MetallicFactor = &mc
-			rs := float32(ml.Roughness)
-			gm.PBRMetallicRoughness.RoughnessFactor = &rs
-			gm.EmissiveFactor[0] = float32(ml.Emissive[0]) / 255
-			gm.EmissiveFactor[1] = float32(ml.Emissive[1]) / 255
-			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
-			texMtl = &ml.TextureMaterial
+			baseColor = &[4]float32{
+				float32(mtl.Color[0]) / 255,
+				float32(mtl.Color[1]) / 255,
+				float32(mtl.Color[2]) / 255,
+				1 - float32(mtl.Transparency),
+			}
+
+			metallic := float32(mtl.Metallic)
+			roughness := float32(mtl.Roughness)
+			gltfMaterial.PBRMetallicRoughness.MetallicFactor = &metallic
+			gltfMaterial.PBRMetallicRoughness.RoughnessFactor = &roughness
+
+			gltfMaterial.EmissiveFactor = [3]float32{
+				float32(mtl.Emissive[0]) / 255,
+				float32(mtl.Emissive[1]) / 255,
+				float32(mtl.Emissive[2]) / 255,
+			}
+
+			textureMaterial = &mtl.TextureMaterial
+
 		case *LambertMaterial:
-			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
-			texMtl = &ml.TextureMaterial
-
-			spmtl := &specular.PBRSpecularGlossiness{
-				DiffuseFactor: &[4]float32{float32(ml.Diffuse[0]) / 255, float32(ml.Diffuse[1]) / 255, float32(ml.Diffuse[2]) / 255, 1},
+			baseColor = &[4]float32{
+				float32(mtl.Color[0]) / 255,
+				float32(mtl.Color[1]) / 255,
+				float32(mtl.Color[2]) / 255,
+				1 - float32(mtl.Transparency),
 			}
 
-			gm.EmissiveFactor[0] = float32(ml.Emissive[0]) / 255
-			gm.EmissiveFactor[1] = float32(ml.Emissive[1]) / 255
-			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
+			specularGlossiness := &specular.PBRSpecularGlossiness{
+				DiffuseFactor: &[4]float32{
+					float32(mtl.Diffuse[0]) / 255,
+					float32(mtl.Diffuse[1]) / 255,
+					float32(mtl.Diffuse[2]) / 255,
+					1,
+				},
+			}
 
-			gm.Extensions[specular.ExtensionName] = spmtl
+			gltfMaterial.EmissiveFactor = [3]float32{
+				float32(mtl.Emissive[0]) / 255,
+				float32(mtl.Emissive[1]) / 255,
+				float32(mtl.Emissive[2]) / 255,
+			}
+
+			gltfMaterial.Extensions[specular.ExtensionName] = specularGlossiness
 			useExtension = true
+			textureMaterial = &mtl.TextureMaterial
+
 		case *PhongMaterial:
-			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
-			texMtl = &ml.TextureMaterial
-
-			spmtl := &specular.PBRSpecularGlossiness{
-				DiffuseFactor:    &[4]float32{float32(ml.Diffuse[0]) / 255, float32(ml.Diffuse[1]) / 255, float32(ml.Diffuse[2]) / 255, 1},
-				SpecularFactor:   &[3]float32{float32(ml.Specular[0]) / 255, float32(ml.Specular[1]) / 255, float32(ml.Specular[2]) / 255},
-				GlossinessFactor: &ml.Shininess,
+			baseColor = &[4]float32{
+				float32(mtl.Color[0]) / 255,
+				float32(mtl.Color[1]) / 255,
+				float32(mtl.Color[2]) / 255,
+				1 - float32(mtl.Transparency),
 			}
 
-			gm.EmissiveFactor[0] = float32(ml.Emissive[0]) / 255
-			gm.EmissiveFactor[1] = float32(ml.Emissive[1]) / 255
-			gm.EmissiveFactor[2] = float32(ml.Emissive[2]) / 255
+			specularGlossiness := &specular.PBRSpecularGlossiness{
+				DiffuseFactor: &[4]float32{
+					float32(mtl.Diffuse[0]) / 255,
+					float32(mtl.Diffuse[1]) / 255,
+					float32(mtl.Diffuse[2]) / 255,
+					1,
+				},
+				SpecularFactor: &[3]float32{
+					float32(mtl.Specular[0]) / 255,
+					float32(mtl.Specular[1]) / 255,
+					float32(mtl.Specular[2]) / 255,
+				},
+				GlossinessFactor: &mtl.Shininess,
+			}
 
-			gm.Extensions[specular.ExtensionName] = spmtl
+			gltfMaterial.EmissiveFactor = [3]float32{
+				float32(mtl.Emissive[0]) / 255,
+				float32(mtl.Emissive[1]) / 255,
+				float32(mtl.Emissive[2]) / 255,
+			}
+
+			gltfMaterial.Extensions[specular.ExtensionName] = specularGlossiness
 			useExtension = true
+			textureMaterial = &mtl.TextureMaterial
+
 		case *TextureMaterial:
-			texMtl = ml
-			cl = &[4]float32{float32(ml.Color[0]) / 255, float32(ml.Color[1]) / 255, float32(ml.Color[2]) / 255, 1 - float32(ml.Transparency)}
+			textureMaterial = mtl
+			baseColor = &[4]float32{
+				float32(mtl.Color[0]) / 255,
+				float32(mtl.Color[1]) / 255,
+				float32(mtl.Color[2]) / 255,
+				1 - float32(mtl.Transparency),
+			}
 		}
 
-		if texMtl != nil && texMtl.HasTexture() {
-			if idx, ok := texMap[texMtl.Texture.Id]; ok {
-				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: idx}
+		// 处理基础颜色纹理
+		if textureMaterial != nil && textureMaterial.HasTexture() {
+			if index, exists := textureMap[textureMaterial.Texture.Id]; exists {
+				gltfMaterial.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: index}
 			} else {
-				texIndex := uint32(len(doc.Textures))
-				texMap[texMtl.Texture.Id] = texIndex
-				tex, err := buildTextureBuffer(doc, doc.Buffers[0], texMtl.Texture)
+				textureIndex := uint32(len(doc.Textures))
+				textureMap[textureMaterial.Texture.Id] = textureIndex
 
+				tex, err := buildTexture(doc, doc.Buffers[0], textureMaterial.Texture)
 				if err != nil {
 					return err
 				}
 
-				gm.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: texIndex}
+				gltfMaterial.PBRMetallicRoughness.BaseColorTexture = &gltf.TextureInfo{Index: textureIndex}
 				doc.Textures = append(doc.Textures, tex)
 			}
 		}
 
-		if texMtl != nil && texMtl.HasNormalTexture() {
-			if idx, ok := texMap[texMtl.Normal.Id]; ok {
-				gm.NormalTexture = &gltf.NormalTexture{Index: &idx}
+		// 处理法线纹理
+		if textureMaterial != nil && textureMaterial.HasNormalTexture() {
+			if index, exists := textureMap[textureMaterial.Normal.Id]; exists {
+				gltfMaterial.NormalTexture = &gltf.NormalTexture{Index: &index}
 			} else {
-				normalTexIndex := uint32(len(doc.Textures))
-				texMap[texMtl.Normal.Id] = normalTexIndex
-				tex, err := buildTextureBuffer(doc, doc.Buffers[0], texMtl.Normal)
+				normalTextureIndex := uint32(len(doc.Textures))
+				textureMap[textureMaterial.Normal.Id] = normalTextureIndex
 
+				tex, err := buildTexture(doc, doc.Buffers[0], textureMaterial.Normal)
 				if err != nil {
 					return err
 				}
-				gm.NormalTexture = &gltf.NormalTexture{Index: &normalTexIndex}
+
+				gltfMaterial.NormalTexture = &gltf.NormalTexture{Index: &normalTextureIndex}
 				doc.Textures = append(doc.Textures, tex)
 			}
 		}
 
-		gm.PBRMetallicRoughness.BaseColorFactor = cl
+		gltfMaterial.PBRMetallicRoughness.BaseColorFactor = baseColor
 
-		if gm.PBRMetallicRoughness.MetallicFactor == nil {
-			mc := float32(0)
-			gm.PBRMetallicRoughness.MetallicFactor = &mc
+		// 设置默认值
+		if gltfMaterial.PBRMetallicRoughness.MetallicFactor == nil {
+			defaultMetallic := float32(0)
+			gltfMaterial.PBRMetallicRoughness.MetallicFactor = &defaultMetallic
 		}
 
-		if gm.PBRMetallicRoughness.RoughnessFactor == nil {
-			rg := float32(1)
-			gm.PBRMetallicRoughness.RoughnessFactor = &rg
+		if gltfMaterial.PBRMetallicRoughness.RoughnessFactor == nil {
+			defaultRoughness := float32(1)
+			gltfMaterial.PBRMetallicRoughness.RoughnessFactor = &defaultRoughness
 		}
 
-		doc.Materials = append(doc.Materials, gm)
+		doc.Materials = append(doc.Materials, gltfMaterial)
 	}
+
+	// 添加扩展
 	if useExtension {
-		has := false
-		for _, nm := range doc.ExtensionsUsed {
-			if nm == specular.ExtensionName {
-				has = true
-				break
+		for _, ext := range doc.ExtensionsUsed {
+			if ext == specular.ExtensionName {
+				return nil
 			}
 		}
-		if !has {
-			doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
-		}
+		doc.ExtensionsUsed = append(doc.ExtensionsUsed, specular.ExtensionName)
 	}
+
 	return nil
+}
+
+// uint32Ptr 返回uint32指针的辅助函数
+func uint32Ptr(v uint32) *uint32 {
+	return &v
 }
