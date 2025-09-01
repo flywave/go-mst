@@ -6,9 +6,10 @@ import (
 	"image/png"
 	"io"
 
+	mat4d "github.com/flywave/go3d/float64/mat4"
+
 	"github.com/flywave/gltf"
 	"github.com/flywave/gltf/ext/specular"
-	mat4d "github.com/flywave/go3d/float64/mat4"
 )
 
 const (
@@ -50,10 +51,10 @@ func CreateDoc() *gltf.Document {
 		Scenes:  []*gltf.Scene{{}},
 		Buffers: []*gltf.Buffer{{}},
 	}
-	
+
 	sceneIndex := uint32(0)
 	doc.Scene = &sceneIndex
-	
+
 	return doc
 }
 
