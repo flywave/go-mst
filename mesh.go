@@ -30,6 +30,7 @@ const V1 uint32 = 1
 const V2 uint32 = 2
 const V3 uint32 = 3
 const V4 uint32 = 4
+const V5 uint32 = 5
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0
@@ -274,6 +275,7 @@ type InstanceMesh struct {
 	BBox      *[6]float64
 	Mesh      *BaseMesh
 	Hash      uint64
+	Props     *Properties `json:"props,omitempty"`
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -305,10 +307,11 @@ type Mesh struct {
 	BaseMesh
 	Version      uint32 `json:"version"`
 	InstanceNode []*InstanceMesh
+	Props        *Properties `json:"props,omitempty"`
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: V4}
+	return &Mesh{Version: V5, Props: &Properties{}}
 }
 
 func (m *Mesh) NodeCount() int {
@@ -436,7 +439,7 @@ func TextureMaterialUnMarshal(rd io.Reader) *TextureMaterial {
 func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial, v uint32) {
 	TextureMaterialMarshal(wt, &mtl.TextureMaterial)
 	writeLittleByte(wt, mtl.Emissive[:])
-	if v < 2 {
+	if v < V2 {
 		writeLittleByte(wt, byte(255))
 	}
 	writeLittleByte(wt, &mtl.Metallic)
@@ -459,7 +462,7 @@ func PbrMaterialUnMarshal(rd io.Reader, v uint32) *PbrMaterial {
 	tmtl := TextureMaterialUnMarshal(rd)
 	mtl.TextureMaterial = *tmtl
 	readLittleByte(rd, mtl.Emissive[:])
-	if v < 2 {
+	if v < V2 {
 		var b byte
 		readLittleByte(rd, &b)
 	}
@@ -720,8 +723,12 @@ func MeshMarshal(wt io.Writer, ms *Mesh) {
 	writeLittleByte(wt, ms.Version)
 	baseMeshMarshal(wt, &ms.BaseMesh, ms.Version)
 	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
-	if ms.Version == V4 {
+	if ms.Version >= V4 {
 		writeLittleByte(wt, ms.Code)
+	}
+	// V5 版本序列化新增属性
+	if ms.Version >= V5 {
+		PropertiesMarshal(wt, ms.Props)
 	}
 }
 
@@ -740,8 +747,12 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	readLittleByte(rd, &ms.Version)
 	ms.BaseMesh = *baseMeshUnMarshal(rd, ms.Version)
 	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
-	if ms.Version == V4 {
+	if ms.Version >= V4 {
 		readLittleByte(rd, &ms.Code)
+	}
+	// V5 版本反序列化新增属性
+	if ms.Version >= V5 {
+		ms.Props = PropertiesUnMarshal(rd)
 	}
 	return &ms
 }
@@ -778,6 +789,10 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) {
 	writeLittleByte(wt, instNd.BBox)
 	baseMeshMarshal(wt, instNd.Mesh, v)
 	writeLittleByte(wt, instNd.Hash)
+	// V5 版本序列化新增属性
+	if v >= V5 {
+		PropertiesMarshal(wt, instNd.Props)
+	}
 }
 
 func MeshInstanceNodesUnMarshal(rd io.Reader, v uint32) []*InstanceMesh {
@@ -820,6 +835,9 @@ func MeshInstanceNodeUnMarshal(rd io.Reader, v uint32) *InstanceMesh {
 	readLittleByte(rd, inst.BBox)
 	inst.Mesh = baseMeshUnMarshal(rd, v)
 	readLittleByte(rd, &inst.Hash)
+	if v >= V5 {
+		inst.Props = PropertiesUnMarshal(rd)
+	}
 	return inst
 }
 
@@ -958,4 +976,175 @@ func CreateTextureFromImage(img image.Image, name string, repet bool) (*Texture,
 	t.Data = CompressImage(buf1)
 	t.Repeated = repet
 	return t, nil
+}
+
+type PropsType int
+
+const (
+	PROP_TYPE_STRING = iota
+	PROP_TYPE_INT
+	PROP_TYPE_FLOAT
+	PROP_TYPE_BOOL
+	PROP_TYPE_ARRAY
+	PROP_TYPE_MAP
+)
+
+type PropsValue struct {
+	Type  PropsType
+	Value interface{}
+}
+
+type Properties map[string]PropsValue
+
+// PropertiesMarshal 序列化Properties
+func PropertiesMarshal(wt io.Writer, props *Properties) {
+	if props == nil {
+		writeLittleByte(wt, uint32(0))
+		return
+	}
+
+	writeLittleByte(wt, uint32(len(*props)))
+	for key, value := range *props {
+		// 写入key
+		writeLittleByte(wt, uint32(len(key)))
+		wt.Write([]byte(key))
+
+		// 写入类型
+		writeLittleByte(wt, uint32(value.Type))
+
+		// 根据类型写入值
+		switch value.Type {
+		case PROP_TYPE_STRING:
+			str := value.Value.(string)
+			writeLittleByte(wt, uint32(len(str)))
+			wt.Write([]byte(str))
+		case PROP_TYPE_INT:
+			writeLittleByte(wt, value.Value.(int64))
+		case PROP_TYPE_FLOAT:
+			writeLittleByte(wt, value.Value.(float64))
+		case PROP_TYPE_BOOL:
+			if value.Value.(bool) {
+				writeLittleByte(wt, uint8(1))
+			} else {
+				writeLittleByte(wt, uint8(0))
+			}
+		case PROP_TYPE_ARRAY:
+			arr := value.Value.([]PropsValue)
+			writeLittleByte(wt, uint32(len(arr)))
+			for _, item := range arr {
+				writeLittleByte(wt, uint32(item.Type))
+				marshalPropsValue(wt, item)
+			}
+		case PROP_TYPE_MAP:
+			subProps := value.Value.(Properties)
+			PropertiesMarshal(wt, &subProps)
+		}
+	}
+}
+
+// 辅助函数，用于序列化单个PropsValue
+func marshalPropsValue(wt io.Writer, value PropsValue) {
+	switch value.Type {
+	case PROP_TYPE_STRING:
+		str := value.Value.(string)
+		writeLittleByte(wt, uint32(len(str)))
+		wt.Write([]byte(str))
+	case PROP_TYPE_INT:
+		writeLittleByte(wt, value.Value.(int64))
+	case PROP_TYPE_FLOAT:
+		writeLittleByte(wt, value.Value.(float64))
+	case PROP_TYPE_BOOL:
+		if value.Value.(bool) {
+			writeLittleByte(wt, uint8(1))
+		} else {
+			writeLittleByte(wt, uint8(0))
+		}
+	case PROP_TYPE_ARRAY:
+		arr := value.Value.([]PropsValue)
+		writeLittleByte(wt, uint32(len(arr)))
+		for _, item := range arr {
+			writeLittleByte(wt, uint32(item.Type))
+			marshalPropsValue(wt, item)
+		}
+	case PROP_TYPE_MAP:
+		subProps := value.Value.(Properties)
+		PropertiesMarshal(wt, &subProps)
+	}
+}
+
+// PropertiesUnMarshal 反序列化Properties
+func PropertiesUnMarshal(rd io.Reader) *Properties {
+	var size uint32
+	readLittleByte(rd, &size)
+
+	if size == 0 {
+		return nil
+	}
+
+	props := make(Properties)
+	for i := uint32(0); i < size; i++ {
+		// 读取key
+		var keyLen uint32
+		readLittleByte(rd, &keyLen)
+		keyBytes := make([]byte, keyLen)
+		rd.Read(keyBytes)
+		key := string(keyBytes)
+
+		// 读取类型
+		var propType uint32
+		readLittleByte(rd, &propType)
+
+		// 根据类型读取值
+		props[key] = unmarshalPropsValue(rd, PropsType(propType))
+	}
+
+	return &props
+}
+
+// 辅助函数，用于反序列化单个PropsValue
+func unmarshalPropsValue(rd io.Reader, propType PropsType) PropsValue {
+	var value interface{}
+
+	switch propType {
+	case PROP_TYPE_STRING:
+		var strLen uint32
+		readLittleByte(rd, &strLen)
+		strBytes := make([]byte, strLen)
+		rd.Read(strBytes)
+		value = string(strBytes)
+	case PROP_TYPE_INT:
+		var intVal int64
+		readLittleByte(rd, &intVal)
+		value = intVal
+	case PROP_TYPE_FLOAT:
+		var floatVal float64
+		readLittleByte(rd, &floatVal)
+		value = floatVal
+	case PROP_TYPE_BOOL:
+		var boolVal uint8
+		readLittleByte(rd, &boolVal)
+		value = boolVal == 1
+	case PROP_TYPE_ARRAY:
+		var arrLen uint32
+		readLittleByte(rd, &arrLen)
+		arr := make([]PropsValue, arrLen)
+		for i := uint32(0); i < arrLen; i++ {
+			var itemType uint32
+			readLittleByte(rd, &itemType)
+			arr[i] = unmarshalPropsValue(rd, PropsType(itemType))
+		}
+		value = arr
+	case PROP_TYPE_MAP:
+		subProps := PropertiesUnMarshal(rd)
+		if subProps != nil {
+			value = *subProps
+		} else {
+			value = make(Properties)
+		}
+	}
+
+	return PropsValue{
+		Type:  propType,
+		Value: value,
+	}
 }

@@ -27,6 +27,7 @@ func TestMeshVersions(t *testing.T) {
 		{"V2", V2, V2},
 		{"V3", V3, V3},
 		{"V4", V4, V4},
+		{"V5", V5, V5},
 	}
 
 	for _, tt := range tests {
@@ -45,11 +46,14 @@ func TestNewMesh(t *testing.T) {
 	if mesh == nil {
 		t.Fatal("NewMesh returned nil")
 	}
-	if mesh.Version != V4 {
-		t.Errorf("Expected version V4, got %d", mesh.Version)
+	if mesh.Version != V5 {
+		t.Errorf("Expected version V5, got %d", mesh.Version)
 	}
 	if len(mesh.Materials) != 0 || len(mesh.Nodes) != 0 {
 		t.Errorf("Expected empty mesh, got materials=%d, nodes=%d", len(mesh.Materials), len(mesh.Nodes))
+	}
+	if mesh.Props == nil {
+		t.Errorf("Expected non-nil Props in V5 mesh")
 	}
 }
 
@@ -483,6 +487,7 @@ func TestConstants(t *testing.T) {
 		"V2":             uint32(2),
 		"V3":             uint32(3),
 		"V4":             uint32(4),
+		"V5":             uint32(5),
 	}
 
 	for name, want := range constants {
@@ -496,8 +501,8 @@ func TestConstants(t *testing.T) {
 				if MSTEXT != want.(string) {
 					t.Errorf("%s = %s, want %s", name, MSTEXT, want)
 				}
-			case "V1", "V2", "V3", "V4":
-				val := map[string]uint32{"V1": V1, "V2": V2, "V3": V3, "V4": V4}[name]
+			case "V1", "V2", "V3", "V4", "V5":
+				val := map[string]uint32{"V1": V1, "V2": V2, "V3": V3, "V4": V4, "V5": V5}[name]
 				if val != want.(uint32) {
 					t.Errorf("%s = %d, want %d", name, val, want)
 				}
