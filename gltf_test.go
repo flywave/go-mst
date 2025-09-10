@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/flywave/go3d/float64/mat4"
+	mat4d "github.com/flywave/go3d/float64/mat4"
 	"github.com/flywave/go3d/vec2"
 	"github.com/flywave/go3d/vec3"
 )
@@ -243,9 +243,9 @@ func TestBuildGltfWithTransforms(t *testing.T) {
 	}
 
 	// 创建变换矩阵
-	transform := mat4.Ident
+	transform := mat4d.Ident
 	transform[3][0] = 10 // 平移x
-	transforms := []*mat4.T{&transform}
+	transforms := []*mat4d.T{&transform}
 
 	err := buildGltfFromBaseMesh(doc, baseMesh, transforms, false)
 	if err != nil {
@@ -443,5 +443,141 @@ func TestUint32Ptr(t *testing.T) {
 
 	if *ptr != value {
 		t.Errorf("Expected %d, got %d", value, *ptr)
+	}
+}
+
+// TestMeshPropertiesToGltfExtensions 测试将Mesh属性导出到GLTF扩展
+func TestMeshPropertiesToGltfExtensions(t *testing.T) {
+	// 创建带有属性的网格
+	mesh := NewMesh()
+
+	// 添加一些测试属性
+	(*mesh.Props)["string_prop"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test_value"}
+	(*mesh.Props)["int_prop"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(42)}
+	(*mesh.Props)["float_prop"] = PropsValue{Type: PROP_TYPE_FLOAT, Value: 3.14}
+	(*mesh.Props)["bool_prop"] = PropsValue{Type: PROP_TYPE_BOOL, Value: true}
+
+	// 添加数组属性
+	arrayProp := []PropsValue{
+		{Type: PROP_TYPE_STRING, Value: "item1"},
+		{Type: PROP_TYPE_STRING, Value: "item2"},
+	}
+	(*mesh.Props)["array_prop"] = PropsValue{Type: PROP_TYPE_ARRAY, Value: arrayProp}
+
+	// 添加嵌套map属性
+	nestedProps := make(Properties)
+	nestedProps["nested_key"] = PropsValue{Type: PROP_TYPE_STRING, Value: "nested_value"}
+	(*mesh.Props)["nested_prop"] = PropsValue{Type: PROP_TYPE_MAP, Value: nestedProps}
+
+	// 创建一个简单的节点
+	mesh.Nodes = []*MeshNode{
+		{
+			Vertices: []vec3.T{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}},
+			FaceGroup: []*MeshTriangle{
+				{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}},
+			},
+		},
+	}
+
+	// 创建实例网格并添加属性
+	transform := mat4d.Ident
+	instanceMesh := &InstanceMesh{
+		Transfors: []*mat4d.T{&transform},
+		Features:  []uint64{1, 2, 3},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 0, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 0}}},
+			},
+		},
+		Props: &Properties{},
+	}
+
+	// 为实例网格添加属性
+	(*instanceMesh.Props)["instance_string"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance_test"}
+	(*instanceMesh.Props)["instance_int"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(999)}
+
+	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
+
+	// 构建GLTF文档
+	doc := CreateDoc()
+	err := BuildGltf(doc, mesh, false)
+	if err != nil {
+		t.Fatalf("BuildGltf failed: %v", err)
+	}
+
+	// 验证主网格属性是否正确添加到扩展中
+	if doc.Extensions == nil {
+		t.Fatal("Extensions should not be nil")
+	}
+
+	mainProps, exists := doc.Extensions["MST_mesh_properties"]
+	if !exists {
+		t.Error("MST_mesh_properties extension not found")
+	} else {
+		propsMap, ok := mainProps.(map[string]interface{})
+		if !ok {
+			t.Error("MST_mesh_properties is not a map")
+		} else {
+			// 验证各种属性类型
+			if val, ok := propsMap["string_prop"]; !ok || val != "test_value" {
+				t.Errorf("string_prop not found or incorrect: %v", val)
+			}
+
+			if val, ok := propsMap["int_prop"]; !ok || val != int64(42) {
+				t.Errorf("int_prop not found or incorrect: %v", val)
+			}
+
+			if val, ok := propsMap["float_prop"]; !ok || val != 3.14 {
+				t.Errorf("float_prop not found or incorrect: %v", val)
+			}
+
+			if val, ok := propsMap["bool_prop"]; !ok || val != true {
+				t.Errorf("bool_prop not found or incorrect: %v", val)
+			}
+
+			// 验证数组属性
+			if val, ok := propsMap["array_prop"]; !ok {
+				t.Error("array_prop not found")
+			} else if arr, ok := val.([]interface{}); !ok {
+				t.Error("array_prop is not an array")
+			} else if len(arr) != 2 {
+				t.Errorf("array_prop length = %d, want 2", len(arr))
+			} else {
+				if arr[0] != "item1" || arr[1] != "item2" {
+					t.Errorf("array_prop values incorrect: %v", arr)
+				}
+			}
+
+			// 验证嵌套属性
+			if val, ok := propsMap["nested_prop"]; !ok {
+				t.Error("nested_prop not found")
+			} else if nestedMap, ok := val.(map[string]interface{}); !ok {
+				t.Error("nested_prop is not a map")
+			} else {
+				if nestedVal, ok := nestedMap["nested_key"]; !ok || nestedVal != "nested_value" {
+					t.Errorf("nested_key not found or incorrect: %v", nestedVal)
+				}
+			}
+		}
+	}
+
+	// 验证实例网格属性是否正确添加到扩展中
+	instanceProps, exists := doc.Extensions["MST_instance_mesh_properties_0"]
+	if !exists {
+		t.Error("MST_instance_mesh_properties_0 extension not found")
+	} else {
+		propsMap, ok := instanceProps.(map[string]interface{})
+		if !ok {
+			t.Error("MST_instance_mesh_properties_0 is not a map")
+		} else {
+			if val, ok := propsMap["instance_string"]; !ok || val != "instance_test" {
+				t.Errorf("instance_string not found or incorrect: %v", val)
+			}
+
+			if val, ok := propsMap["instance_int"]; !ok || val != int64(999) {
+				t.Errorf("instance_int not found or incorrect: %v", val)
+			}
+		}
 	}
 }

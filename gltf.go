@@ -3,6 +3,7 @@ package mst
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image/png"
 	"io"
 
@@ -119,11 +120,49 @@ func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
 
 // BuildGltf 构建GLTF文档
 func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
+	// 处理主网格的属性
+	if mesh.Props != nil && len(*mesh.Props) > 0 {
+		if doc.Extensions == nil {
+			doc.Extensions = make(map[string]interface{})
+		}
+
+		// 将属性添加到文档扩展中
+		propsMap := propsToMap(mesh.Props)
+		if propsMap != nil {
+			if ext, exists := doc.Extensions["MST_mesh_properties"]; exists {
+				if extMap, ok := ext.(map[string]interface{}); ok {
+					// 合并属性
+					for k, v := range propsMap {
+						extMap[k] = v
+					}
+				} else {
+					doc.Extensions["MST_mesh_properties"] = propsMap
+				}
+			} else {
+				doc.Extensions["MST_mesh_properties"] = propsMap
+			}
+		}
+	}
+
 	if err := buildGltfFromBaseMesh(doc, &mesh.BaseMesh, nil, exportOutline); err != nil {
 		return err
 	}
 
-	for _, instance := range mesh.InstanceNode {
+	for i, instance := range mesh.InstanceNode {
+		// 处理实例网格的属性
+		if instance.Props != nil && len(*instance.Props) > 0 {
+			if doc.Extensions == nil {
+				doc.Extensions = make(map[string]interface{})
+			}
+
+			// 将实例属性添加到文档扩展中，使用实例索引作为键
+			propsMap := propsToMap(instance.Props)
+			if propsMap != nil {
+				instanceKey := "MST_instance_mesh_properties_" + fmt.Sprintf("%d", i)
+				doc.Extensions[instanceKey] = propsMap
+			}
+		}
+
 		if err := buildGltfFromBaseMesh(doc, instance.Mesh, instance.Transfors, false); err != nil {
 			return err
 		}
@@ -687,4 +726,43 @@ func fillMaterials(doc *gltf.Document, materials []MeshMaterial) error {
 // uint32Ptr 返回uint32指针的辅助函数
 func uint32Ptr(v uint32) *uint32 {
 	return &v
+}
+
+// propsToMap 将Properties转换为map[string]interface{}格式，以便序列化到GLTF扩展中
+func propsToMap(props *Properties) map[string]interface{} {
+	if props == nil {
+		return nil
+	}
+
+	result := make(map[string]interface{})
+	for key, value := range *props {
+		result[key] = propsValueToInterface(value)
+	}
+	return result
+}
+
+// propsValueToInterface 将PropsValue转换为interface{}格式
+func propsValueToInterface(value PropsValue) interface{} {
+	switch value.Type {
+	case PROP_TYPE_STRING:
+		return value.Value.(string)
+	case PROP_TYPE_INT:
+		return value.Value.(int64)
+	case PROP_TYPE_FLOAT:
+		return value.Value.(float64)
+	case PROP_TYPE_BOOL:
+		return value.Value.(bool)
+	case PROP_TYPE_ARRAY:
+		arr := value.Value.([]PropsValue)
+		result := make([]interface{}, len(arr))
+		for i, item := range arr {
+			result[i] = propsValueToInterface(item)
+		}
+		return result
+	case PROP_TYPE_MAP:
+		subProps := value.Value.(Properties)
+		return propsToMap(&subProps)
+	default:
+		return nil
+	}
 }
