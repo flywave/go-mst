@@ -200,6 +200,7 @@ type MeshNode struct {
 	Mat       *dmat.T         `json:"mat,omitempty"`
 	FaceGroup []*MeshTriangle `json:"faceGroup,omitempty"`
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
+	Props     *Properties     `json:"props,omitempty"`
 }
 
 func (n *MeshNode) ResortVtVn(m *Mesh) {
@@ -651,6 +652,12 @@ func MeshNodeMarshal(wt io.Writer, nd *MeshNode) {
 	for _, eg := range nd.EdgeGroup {
 		MeshOutlineMarshal(wt, eg)
 	}
+	// V5 版本序列化新增属性
+	if nd.Props != nil {
+		PropertiesMarshal(wt, nd.Props)
+	} else {
+		writeLittleByte(wt, uint32(0))
+	}
 }
 
 func MeshNodeUnMarshal(rd io.Reader) *MeshNode {
@@ -698,6 +705,8 @@ func MeshNodeUnMarshal(rd io.Reader) *MeshNode {
 	for i := 0; i < int(size); i++ {
 		nd.EdgeGroup[i] = MeshOutlineUnMarshal(rd)
 	}
+	// V5 版本反序列化新增属性
+	nd.Props = PropertiesUnMarshal(rd)
 	return &nd
 }
 

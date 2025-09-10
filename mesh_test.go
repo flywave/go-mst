@@ -273,6 +273,7 @@ func TestMeshNodeMarshalUnmarshal(t *testing.T) {
 		TexCoords: []vec2.T{{0, 0}, {1, 0}, {0, 1}},
 		FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}}},
 		EdgeGroup: []*MeshOutline{{Batchid: 0, Edges: [][2]uint32{{0, 1}, {1, 2}, {2, 0}}}},
+		Props:     &Properties{"test": {Type: PROP_TYPE_STRING, Value: "value"}},
 	}
 
 	var buf bytes.Buffer
@@ -288,6 +289,12 @@ func TestMeshNodeMarshalUnmarshal(t *testing.T) {
 	}
 	if len(unmarshaled.EdgeGroup) != len(node.EdgeGroup) {
 		t.Errorf("edge groups count mismatch")
+	}
+	// 检查Props属性
+	if unmarshaled.Props == nil {
+		t.Errorf("props should not be nil")
+	} else if (*unmarshaled.Props)["test"].Value != "value" {
+		t.Errorf("props value mismatch")
 	}
 }
 
@@ -327,6 +334,51 @@ func TestMeshMarshalUnmarshal(t *testing.T) {
 				t.Errorf("code mismatch for V4")
 			}
 		})
+	}
+}
+
+// TestMeshNodeWithProps 测试带Props属性的节点
+func TestMeshNodeWithProps(t *testing.T) {
+	// 测试带Props的节点
+	nodeWithProps := &MeshNode{
+		Vertices:  []vec3.T{{0, 0, 0}},
+		FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+		Props: &Properties{
+			"name": {Type: PROP_TYPE_STRING, Value: "test_node"},
+			"id":   {Type: PROP_TYPE_INT, Value: int64(123)},
+		},
+	}
+
+	var buf bytes.Buffer
+	MeshNodeMarshal(&buf, nodeWithProps)
+
+	unmarshaledWithProps := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
+
+	if unmarshaledWithProps.Props == nil {
+		t.Error("Props should not be nil")
+	} else {
+		if (*unmarshaledWithProps.Props)["name"].Value != "test_node" {
+			t.Error("String property value mismatch")
+		}
+		if (*unmarshaledWithProps.Props)["id"].Value != int64(123) {
+			t.Error("Int property value mismatch")
+		}
+	}
+
+	// 测试不带Props的节点
+	nodeWithoutProps := &MeshNode{
+		Vertices:  []vec3.T{{0, 0, 0}},
+		FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+		Props:     nil,
+	}
+
+	var buf2 bytes.Buffer
+	MeshNodeMarshal(&buf2, nodeWithoutProps)
+
+	unmarshaledWithoutProps := MeshNodeUnMarshal(bytes.NewReader(buf2.Bytes()))
+
+	if unmarshaledWithoutProps.Props != nil && len(*unmarshaledWithoutProps.Props) > 0 {
+		t.Error("Props should be nil or empty for node without props")
 	}
 }
 
