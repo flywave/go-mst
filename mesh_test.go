@@ -278,7 +278,9 @@ func TestMeshNodeMarshalUnmarshal(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -321,7 +323,9 @@ func TestMeshMarshalUnmarshal(t *testing.T) {
 			}
 
 			var buf bytes.Buffer
-			MeshMarshal(&buf, mesh)
+			if err := MeshMarshal(&buf, mesh); err != nil {
+				t.Fatalf("MeshMarshal failed: %v", err)
+			}
 
 			unmarshaled := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -351,7 +355,9 @@ func TestMeshNodeWithProps(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, nodeWithProps)
+	if err := MeshNodeMarshal(&buf, nodeWithProps); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaledWithProps := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -374,7 +380,9 @@ func TestMeshNodeWithProps(t *testing.T) {
 	}
 
 	var buf2 bytes.Buffer
-	MeshNodeMarshal(&buf2, nodeWithoutProps)
+	if err := MeshNodeMarshal(&buf2, nodeWithoutProps); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaledWithoutProps := MeshNodeUnMarshal(bytes.NewReader(buf2.Bytes()))
 
@@ -463,7 +471,9 @@ func TestInstanceMeshV5Properties(t *testing.T) {
 
 	// 序列化整个Mesh
 	var buf bytes.Buffer
-	MeshMarshal(&buf, parentMesh)
+	if err := MeshMarshal(&buf, parentMesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	// 反序列化
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
@@ -663,7 +673,9 @@ func TestMeshV5Properties(t *testing.T) {
 
 	// 序列化
 	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	// 反序列化
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
@@ -741,7 +753,9 @@ func TestMeshComplexStructure(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -858,7 +872,9 @@ func TestMeshReadWriteFile(t *testing.T) {
 
 	// 测试内存序列化
 	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -930,7 +946,9 @@ func TestMstToObj(t *testing.T) {
 
 	// 写入测试文件
 	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	// 测试文件读写
 	f, err := os.Create(testFile)
@@ -1028,7 +1046,9 @@ func TestMeshNodeWithTransform(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 	if unmarshaled.Mat == nil {
@@ -1047,7 +1067,9 @@ func TestMeshNodeWithColors(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1094,7 +1116,9 @@ func TestMeshWithMultipleFaceGroups(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1121,7 +1145,9 @@ func TestMeshWithMultipleEdgeGroups(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1205,7 +1231,9 @@ func TestMeshNodeMarshalUnmarshalWithTransform(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1225,7 +1253,9 @@ func TestMeshNodeMarshalUnmarshalWithoutTransform(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1353,7 +1383,9 @@ func TestMeshFaceAndEdgeGroups(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	MeshNodeMarshal(&buf, node)
+	if err := MeshNodeMarshal(&buf, node); err != nil {
+		t.Fatalf("MeshNodeMarshal failed: %v", err)
+	}
 
 	unmarshaled := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1394,7 +1426,9 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
 
 	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 
@@ -1534,7 +1568,9 @@ func TestMeshReadWriteLargeData(t *testing.T) {
 	mesh.Props = &props
 
 	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
 
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 

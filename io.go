@@ -23,20 +23,24 @@ func toLittleByteOrder(v interface{}) []byte {
 	return b.Bytes()
 }
 
-func writeLittleByte(wt io.Writer, v interface{}) {
+func writeLittleByte(wt io.Writer, v interface{}) error {
 	buf := toLittleByteOrder(v)
 	if buf != nil {
-		wt.Write(buf)
+		_, err := wt.Write(buf)
+		return err
 	}
+	return nil
 }
 
 func readLittleByte(rd io.Reader, v interface{}) error {
 	return binary.Read(rd, binary.LittleEndian, v)
 }
 
-func BaseMaterialMarshal(wt io.Writer, mtl *BaseMaterial) {
-	writeLittleByte(wt, &mtl.Color)
-	writeLittleByte(wt, &mtl.Transparency)
+func BaseMaterialMarshal(wt io.Writer, mtl *BaseMaterial) error {
+	if err := writeLittleByte(wt, &mtl.Color); err != nil {
+		return err
+	}
+	return writeLittleByte(wt, &mtl.Transparency)
 }
 
 func BaseMaterialUnMarshal(rd io.Reader) *BaseMaterial {
@@ -46,17 +50,35 @@ func BaseMaterialUnMarshal(rd io.Reader) *BaseMaterial {
 	return &mtl
 }
 
-func TextureMarshal(wt io.Writer, tex *Texture) {
-	writeLittleByte(wt, tex.Id)
-	writeLittleByte(wt, uint32(len(tex.Name)))
-	wt.Write([]byte(tex.Name))
-	writeLittleByte(wt, &tex.Size)
-	writeLittleByte(wt, tex.Format)
-	writeLittleByte(wt, tex.Type)
-	writeLittleByte(wt, tex.Compressed)
-	writeLittleByte(wt, uint32(len(tex.Data)))
-	wt.Write(tex.Data)
-	writeLittleByte(wt, tex.Repeated)
+func TextureMarshal(wt io.Writer, tex *Texture) error {
+	if err := writeLittleByte(wt, tex.Id); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, uint32(len(tex.Name))); err != nil {
+		return err
+	}
+	if _, err := wt.Write([]byte(tex.Name)); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &tex.Size); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, tex.Format); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, tex.Type); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, tex.Compressed); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, uint32(len(tex.Data))); err != nil {
+		return err
+	}
+	if _, err := wt.Write(tex.Data); err != nil {
+		return err
+	}
+	return writeLittleByte(wt, tex.Repeated)
 }
 
 func TextureUnMarshal(rd io.Reader) *Texture {
@@ -79,19 +101,29 @@ func TextureUnMarshal(rd io.Reader) *Texture {
 	return tex
 }
 
-func TextureMaterialMarshal(wt io.Writer, mtl *TextureMaterial) {
-	BaseMaterialMarshal(wt, &mtl.BaseMaterial)
+func TextureMaterialMarshal(wt io.Writer, mtl *TextureMaterial) error {
+	if err := BaseMaterialMarshal(wt, &mtl.BaseMaterial); err != nil {
+		return err
+	}
 	if mtl.Texture != nil {
-		writeLittleByte(wt, uint16(1))
-		TextureMarshal(wt, mtl.Texture)
+		if err := writeLittleByte(wt, uint16(1)); err != nil {
+			return err
+		}
+		if err := TextureMarshal(wt, mtl.Texture); err != nil {
+			return err
+		}
 	} else {
-		writeLittleByte(wt, uint16(0))
+		if err := writeLittleByte(wt, uint16(0)); err != nil {
+			return err
+		}
 	}
 	if mtl.Normal != nil {
-		writeLittleByte(wt, uint16(1))
-		TextureMarshal(wt, mtl.Normal)
+		if err := writeLittleByte(wt, uint16(1)); err != nil {
+			return err
+		}
+		return TextureMarshal(wt, mtl.Normal)
 	} else {
-		writeLittleByte(wt, uint16(0))
+		return writeLittleByte(wt, uint16(0))
 	}
 }
 
@@ -111,25 +143,55 @@ func TextureMaterialUnMarshal(rd io.Reader) *TextureMaterial {
 	return &tmtl
 }
 
-func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial, v uint32) {
-	TextureMaterialMarshal(wt, &mtl.TextureMaterial)
-	writeLittleByte(wt, mtl.Emissive[:])
-	if v < V2 {
-		writeLittleByte(wt, byte(255))
+func PbrMaterialMarshal(wt io.Writer, mtl *PbrMaterial, v uint32) error {
+	if err := TextureMaterialMarshal(wt, &mtl.TextureMaterial); err != nil {
+		return err
 	}
-	writeLittleByte(wt, &mtl.Metallic)
-	writeLittleByte(wt, &mtl.Roughness)
-	writeLittleByte(wt, &mtl.Reflectance)
-	writeLittleByte(wt, &mtl.AmbientOcclusion)
-	writeLittleByte(wt, &mtl.ClearCoat)
-	writeLittleByte(wt, &mtl.ClearCoatRoughness)
-	writeLittleByte(wt, mtl.ClearCoatNormal[:])
-	writeLittleByte(wt, &mtl.Anisotropy)
-	writeLittleByte(wt, mtl.AnisotropyDirection[:])
-	writeLittleByte(wt, &mtl.Thickness)
-	writeLittleByte(wt, &mtl.SubSurfacePower)
-	writeLittleByte(wt, mtl.SheenColor[:])
-	writeLittleByte(wt, mtl.SubSurfaceColor[:])
+	if err := writeLittleByte(wt, mtl.Emissive[:]); err != nil {
+		return err
+	}
+	if v < V2 {
+		if err := writeLittleByte(wt, byte(255)); err != nil {
+			return err
+		}
+	}
+	if err := writeLittleByte(wt, &mtl.Metallic); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.Roughness); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.Reflectance); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.AmbientOcclusion); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.ClearCoat); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.ClearCoatRoughness); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, mtl.ClearCoatNormal[:]); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.Anisotropy); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, mtl.AnisotropyDirection[:]); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.Thickness); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.SubSurfacePower); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, mtl.SheenColor[:]); err != nil {
+		return err
+	}
+	return writeLittleByte(wt, mtl.SubSurfaceColor[:])
 }
 
 func PbrMaterialUnMarshal(rd io.Reader, v uint32) *PbrMaterial {
@@ -157,11 +219,17 @@ func PbrMaterialUnMarshal(rd io.Reader, v uint32) *PbrMaterial {
 	return &mtl
 }
 
-func LambertMaterialMarshal(wt io.Writer, mtl *LambertMaterial) {
-	TextureMaterialMarshal(wt, &mtl.TextureMaterial)
-	writeLittleByte(wt, mtl.Ambient[:])
-	writeLittleByte(wt, mtl.Diffuse[:])
-	writeLittleByte(wt, mtl.Emissive[:])
+func LambertMaterialMarshal(wt io.Writer, mtl *LambertMaterial) error {
+	if err := TextureMaterialMarshal(wt, &mtl.TextureMaterial); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, mtl.Ambient[:]); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, mtl.Diffuse[:]); err != nil {
+		return err
+	}
+	return writeLittleByte(wt, mtl.Emissive[:])
 }
 
 func LambertMaterialUnMarshal(rd io.Reader) *LambertMaterial {
@@ -174,11 +242,17 @@ func LambertMaterialUnMarshal(rd io.Reader) *LambertMaterial {
 	return &mtl
 }
 
-func PhongMaterialMarshal(wt io.Writer, mtl *PhongMaterial) {
-	LambertMaterialMarshal(wt, &mtl.LambertMaterial)
-	writeLittleByte(wt, mtl.Specular[:])
-	writeLittleByte(wt, &mtl.Shininess)
-	writeLittleByte(wt, &mtl.Specularity)
+func PhongMaterialMarshal(wt io.Writer, mtl *PhongMaterial) error {
+	if err := LambertMaterialMarshal(wt, &mtl.LambertMaterial); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, mtl.Specular[:]); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, &mtl.Shininess); err != nil {
+		return err
+	}
+	return writeLittleByte(wt, &mtl.Specularity)
 }
 
 func PhongMaterialUnMarshal(rd io.Reader) *PhongMaterial {
@@ -191,24 +265,35 @@ func PhongMaterialUnMarshal(rd io.Reader) *PhongMaterial {
 	return &mtl
 }
 
-func MaterialMarshal(wt io.Writer, mt MeshMaterial, v uint32) {
+func MaterialMarshal(wt io.Writer, mt MeshMaterial, v uint32) error {
 	switch mtl := mt.(type) {
 	case *BaseMaterial:
-		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_COLOR))
-		BaseMaterialMarshal(wt, mtl)
+		if err := writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_COLOR)); err != nil {
+			return err
+		}
+		return BaseMaterialMarshal(wt, mtl)
 	case *TextureMaterial:
-		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_TEXTURE))
-		TextureMaterialMarshal(wt, mtl)
+		if err := writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_TEXTURE)); err != nil {
+			return err
+		}
+		return TextureMaterialMarshal(wt, mtl)
 	case *PbrMaterial:
-		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PBR))
-		PbrMaterialMarshal(wt, mtl, v)
+		if err := writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PBR)); err != nil {
+			return err
+		}
+		return PbrMaterialMarshal(wt, mtl, v)
 	case *LambertMaterial:
-		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT))
-		LambertMaterialMarshal(wt, mtl)
+		if err := writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_LAMBERT)); err != nil {
+			return err
+		}
+		return LambertMaterialMarshal(wt, mtl)
 	case *PhongMaterial:
-		writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PHONG))
-		PhongMaterialMarshal(wt, mtl)
+		if err := writeLittleByte(wt, uint32(MESH_TRIANGLE_MATERIAL_TYPE_PHONG)); err != nil {
+			return err
+		}
+		return PhongMaterialMarshal(wt, mtl)
 	}
+	return nil
 }
 
 func MaterialUnMarshal(rd io.Reader, v uint32) MeshMaterial {
@@ -230,11 +315,16 @@ func MaterialUnMarshal(rd io.Reader, v uint32) MeshMaterial {
 	}
 }
 
-func MtlsMarshal(wt io.Writer, mtls []MeshMaterial, v uint32) {
-	writeLittleByte(wt, uint32(len(mtls)))
-	for _, mtl := range mtls {
-		MaterialMarshal(wt, mtl, v)
+func MtlsMarshal(wt io.Writer, mtls []MeshMaterial, v uint32) error {
+	if err := writeLittleByte(wt, uint32(len(mtls))); err != nil {
+		return err
 	}
+	for _, mtl := range mtls {
+		if err := MaterialMarshal(wt, mtl, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func MtlsUnMarshal(rd io.Reader, v uint32) []MeshMaterial {
@@ -247,12 +337,19 @@ func MtlsUnMarshal(rd io.Reader, v uint32) []MeshMaterial {
 	return mtls
 }
 
-func MeshTriangleMarshal(wt io.Writer, nd *MeshTriangle) {
-	writeLittleByte(wt, nd.Batchid)
-	writeLittleByte(wt, uint32(len(nd.Faces)))
-	for _, f := range nd.Faces {
-		writeLittleByte(wt, &f.Vertex)
+func MeshTriangleMarshal(wt io.Writer, nd *MeshTriangle) error {
+	if err := writeLittleByte(wt, nd.Batchid); err != nil {
+		return err
 	}
+	if err := writeLittleByte(wt, uint32(len(nd.Faces))); err != nil {
+		return err
+	}
+	for _, f := range nd.Faces {
+		if err := writeLittleByte(wt, &f.Vertex); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
@@ -269,12 +366,19 @@ func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
 	return &nd
 }
 
-func MeshOutlineMarshal(wt io.Writer, nd *MeshOutline) {
-	writeLittleByte(wt, nd.Batchid)
-	writeLittleByte(wt, uint32(len(nd.Edges)))
-	for _, e := range nd.Edges {
-		writeLittleByte(wt, &e)
+func MeshOutlineMarshal(wt io.Writer, nd *MeshOutline) error {
+	if err := writeLittleByte(wt, nd.Batchid); err != nil {
+		return err
 	}
+	if err := writeLittleByte(wt, uint32(len(nd.Edges))); err != nil {
+		return err
+	}
+	for _, e := range nd.Edges {
+		if err := writeLittleByte(wt, &e); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func MeshOutlineUnMarshal(rd io.Reader) *MeshOutline {
@@ -289,49 +393,84 @@ func MeshOutlineUnMarshal(rd io.Reader) *MeshOutline {
 	return &nd
 }
 
-func MeshNodeMarshal(wt io.Writer, nd *MeshNode) {
-	writeLittleByte(wt, uint32(len(nd.Vertices)))
+func MeshNodeMarshal(wt io.Writer, nd *MeshNode) error {
+	if err := writeLittleByte(wt, uint32(len(nd.Vertices))); err != nil {
+		return err
+	}
 	for i := range nd.Vertices {
-		writeLittleByte(wt, nd.Vertices[i][:])
+		if err := writeLittleByte(wt, nd.Vertices[i][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(nd.Normals)))
+	if err := writeLittleByte(wt, uint32(len(nd.Normals))); err != nil {
+		return err
+	}
 	for i := range nd.Normals {
-		writeLittleByte(wt, nd.Normals[i][:])
+		if err := writeLittleByte(wt, nd.Normals[i][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(nd.Colors)))
+	if err := writeLittleByte(wt, uint32(len(nd.Colors))); err != nil {
+		return err
+	}
 	for i := range nd.Colors {
-		writeLittleByte(wt, nd.Colors[i][:])
-
+		if err := writeLittleByte(wt, nd.Colors[i][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(nd.TexCoords)))
+	if err := writeLittleByte(wt, uint32(len(nd.TexCoords))); err != nil {
+		return err
+	}
 	for i := range nd.TexCoords {
-		writeLittleByte(wt, nd.TexCoords[i][:])
+		if err := writeLittleByte(wt, nd.TexCoords[i][:]); err != nil {
+			return err
+		}
 	}
 	if nd.Mat != nil {
-		writeLittleByte(wt, uint8(1))
-		writeLittleByte(wt, nd.Mat[0][:])
-		writeLittleByte(wt, nd.Mat[1][:])
-		writeLittleByte(wt, nd.Mat[2][:])
-		writeLittleByte(wt, nd.Mat[3][:])
+		if err := writeLittleByte(wt, uint8(1)); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[0][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[1][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[2][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[3][:]); err != nil {
+			return err
+		}
 	} else {
-		writeLittleByte(wt, uint8(0))
+		if err := writeLittleByte(wt, uint8(0)); err != nil {
+			return err
+		}
 	}
 
-	writeLittleByte(wt, uint32(len(nd.FaceGroup)))
+	if err := writeLittleByte(wt, uint32(len(nd.FaceGroup))); err != nil {
+		return err
+	}
 	for _, fg := range nd.FaceGroup {
-		MeshTriangleMarshal(wt, fg)
+		if err := MeshTriangleMarshal(wt, fg); err != nil {
+			return err
+		}
 	}
 
-	writeLittleByte(wt, uint32(len(nd.EdgeGroup)))
+	if err := writeLittleByte(wt, uint32(len(nd.EdgeGroup))); err != nil {
+		return err
+	}
 	for _, eg := range nd.EdgeGroup {
-		MeshOutlineMarshal(wt, eg)
+		if err := MeshOutlineMarshal(wt, eg); err != nil {
+			return err
+		}
 	}
 	// V5 版本序列化新增属性
 	if nd.Props != nil && len(*nd.Props) > 0 {
-		PropertiesMarshal(wt, nd.Props)
+		return PropertiesMarshal(wt, nd.Props)
 	} else {
 		// 如果Props为nil，写入size为0
-		writeLittleByte(wt, uint32(0))
+		return writeLittleByte(wt, uint32(0))
 	}
 }
 
@@ -385,22 +524,34 @@ func MeshNodeUnMarshal(rd io.Reader) *MeshNode {
 	return &nd
 }
 
-func MeshNodesMarshal(wt io.Writer, nds []*MeshNode) {
-	writeLittleByte(wt, uint32(len(nds)))
-	for _, nd := range nds {
-		MeshNodeMarshal(wt, nd)
+func MeshNodesMarshal(wt io.Writer, nds []*MeshNode) error {
+	if err := writeLittleByte(wt, uint32(len(nds))); err != nil {
+		return err
 	}
-}
-
-func MeshNodesMarshalWithVersion(wt io.Writer, nds []*MeshNode, v uint32) {
-	writeLittleByte(wt, uint32(len(nds)))
 	for _, nd := range nds {
-		if v >= V5 {
-			MeshNodeMarshal(wt, nd)
-		} else {
-			MeshNodeMarshalWithoutProps(wt, nd)
+		if err := MeshNodeMarshal(wt, nd); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+func MeshNodesMarshalWithVersion(wt io.Writer, nds []*MeshNode, v uint32) error {
+	if err := writeLittleByte(wt, uint32(len(nds))); err != nil {
+		return err
+	}
+	for _, nd := range nds {
+		if v >= V5 {
+			if err := MeshNodeMarshal(wt, nd); err != nil {
+				return err
+			}
+		} else {
+			if err := MeshNodeMarshalWithoutProps(wt, nd); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
@@ -413,29 +564,44 @@ func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 	return nds
 }
 
-func MeshMarshal(wt io.Writer, ms *Mesh) {
-	wt.Write([]byte(MESH_SIGNATURE))
-	writeLittleByte(wt, ms.Version)
+func MeshMarshal(wt io.Writer, ms *Mesh) error {
+	if _, err := wt.Write([]byte(MESH_SIGNATURE)); err != nil {
+		return err
+	}
+	if err := writeLittleByte(wt, ms.Version); err != nil {
+		return err
+	}
 	// V4及以上版本序列化Code字段
 	if ms.Version >= V4 {
-		writeLittleByte(wt, ms.BaseMesh.Code)
+		if err := writeLittleByte(wt, ms.BaseMesh.Code); err != nil {
+			return err
+		}
 	}
-	MtlsMarshal(wt, ms.Materials, ms.Version)
-	MeshNodesMarshalWithVersion(wt, ms.Nodes, ms.Version)
-	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
+	if err := MtlsMarshal(wt, ms.Materials, ms.Version); err != nil {
+		return err
+	}
+	if err := MeshNodesMarshalWithVersion(wt, ms.Nodes, ms.Version); err != nil {
+		return err
+	}
+	if err := MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version); err != nil {
+		return err
+	}
 	// V5 版本序列化新增属性
 	if ms.Version >= V5 {
 		if ms.Props != nil && len(*ms.Props) > 0 {
 			// 先写入标记位1表示有Properties
-			writeLittleByte(wt, uint32(1))
-			if err := PropertiesMarshal(wt, ms.Props); err != nil {
-				return
+			if err := writeLittleByte(wt, uint32(1)); err != nil {
+				return err
 			}
+			return PropertiesMarshal(wt, ms.Props)
 		} else {
 			// 如果Props为nil，写入标记位0
-			writeLittleByte(wt, uint32(0))
+			if err := writeLittleByte(wt, uint32(0)); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func MeshUnMarshal(rd io.Reader) *Mesh {
@@ -475,82 +641,150 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	return &ms
 }
 
-func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh, v uint32) {
-	writeLittleByte(wt, uint32(len(instNd)))
-	for _, nd := range instNd {
-		MeshInstanceNodeMarshal(wt, nd, v)
+func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh, v uint32) error {
+	if err := writeLittleByte(wt, uint32(len(instNd))); err != nil {
+		return err
 	}
+	for _, nd := range instNd {
+		if err := MeshInstanceNodeMarshal(wt, nd, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // MeshNodesMarshalForInstanceMesh 序列化InstanceMesh中的MeshNode，不序列化Props属性
-func MeshNodesMarshalForInstanceMesh(wt io.Writer, nds []*MeshNode) {
-	writeLittleByte(wt, uint32(len(nds)))
-	for _, nd := range nds {
-		MeshNodeMarshalWithoutProps(wt, nd)
+func MeshNodesMarshalForInstanceMesh(wt io.Writer, nds []*MeshNode) error {
+	if err := writeLittleByte(wt, uint32(len(nds))); err != nil {
+		return err
 	}
+	for _, nd := range nds {
+		if err := MeshNodeMarshalWithoutProps(wt, nd); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // MeshNodeMarshalWithoutProps 序列化MeshNode，不序列化Props属性
-func MeshNodeMarshalWithoutProps(wt io.Writer, nd *MeshNode) {
-	writeLittleByte(wt, uint32(len(nd.Vertices)))
+func MeshNodeMarshalWithoutProps(wt io.Writer, nd *MeshNode) error {
+	if err := writeLittleByte(wt, uint32(len(nd.Vertices))); err != nil {
+		return err
+	}
 	for i := range nd.Vertices {
-		writeLittleByte(wt, nd.Vertices[i][:])
+		if err := writeLittleByte(wt, nd.Vertices[i][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(nd.Normals)))
+	if err := writeLittleByte(wt, uint32(len(nd.Normals))); err != nil {
+		return err
+	}
 	for i := range nd.Normals {
-		writeLittleByte(wt, nd.Normals[i][:])
+		if err := writeLittleByte(wt, nd.Normals[i][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(nd.Colors)))
+	if err := writeLittleByte(wt, uint32(len(nd.Colors))); err != nil {
+		return err
+	}
 	for i := range nd.Colors {
-		writeLittleByte(wt, nd.Colors[i][:])
-
+		if err := writeLittleByte(wt, nd.Colors[i][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(nd.TexCoords)))
+	if err := writeLittleByte(wt, uint32(len(nd.TexCoords))); err != nil {
+		return err
+	}
 	for i := range nd.TexCoords {
-		writeLittleByte(wt, nd.TexCoords[i][:])
+		if err := writeLittleByte(wt, nd.TexCoords[i][:]); err != nil {
+			return err
+		}
 	}
 	if nd.Mat != nil {
-		writeLittleByte(wt, uint8(1))
-		writeLittleByte(wt, nd.Mat[0][:])
-		writeLittleByte(wt, nd.Mat[1][:])
-		writeLittleByte(wt, nd.Mat[2][:])
-		writeLittleByte(wt, nd.Mat[3][:])
+		if err := writeLittleByte(wt, uint8(1)); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[0][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[1][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[2][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, nd.Mat[3][:]); err != nil {
+			return err
+		}
 	} else {
-		writeLittleByte(wt, uint8(0))
+		if err := writeLittleByte(wt, uint8(0)); err != nil {
+			return err
+		}
 	}
 
-	writeLittleByte(wt, uint32(len(nd.FaceGroup)))
+	if err := writeLittleByte(wt, uint32(len(nd.FaceGroup))); err != nil {
+		return err
+	}
 	for _, fg := range nd.FaceGroup {
-		MeshTriangleMarshal(wt, fg)
+		if err := MeshTriangleMarshal(wt, fg); err != nil {
+			return err
+		}
 	}
 
-	writeLittleByte(wt, uint32(len(nd.EdgeGroup)))
-	for _, eg := range nd.EdgeGroup {
-		MeshOutlineMarshal(wt, eg)
+	if err := writeLittleByte(wt, uint32(len(nd.EdgeGroup))); err != nil {
+		return err
 	}
+	for _, eg := range nd.EdgeGroup {
+		if err := MeshOutlineMarshal(wt, eg); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) {
-	writeLittleByte(wt, uint32(len(instNd.Transfors)))
+func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) error {
+	if err := writeLittleByte(wt, uint32(len(instNd.Transfors))); err != nil {
+		return err
+	}
 	for _, mt := range instNd.Transfors {
-		writeLittleByte(wt, mt[0][:])
-		writeLittleByte(wt, mt[1][:])
-		writeLittleByte(wt, mt[2][:])
-		writeLittleByte(wt, mt[3][:])
+		if err := writeLittleByte(wt, mt[0][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, mt[1][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, mt[2][:]); err != nil {
+			return err
+		}
+		if err := writeLittleByte(wt, mt[3][:]); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, uint32(len(instNd.Features)))
+	if err := writeLittleByte(wt, uint32(len(instNd.Features))); err != nil {
+		return err
+	}
 	for _, f := range instNd.Features {
-		writeLittleByte(wt, f)
+		if err := writeLittleByte(wt, f); err != nil {
+			return err
+		}
 	}
-	writeLittleByte(wt, instNd.BBox)
+	if err := writeLittleByte(wt, instNd.BBox); err != nil {
+		return err
+	}
 	// 序列化Mesh字段
-	MtlsMarshal(wt, instNd.Mesh.Materials, v)
+	if err := MtlsMarshal(wt, instNd.Mesh.Materials, v); err != nil {
+		return err
+	}
 	// 修复：使用正确的函数来序列化Mesh.Nodes，确保Props字段能被正确处理
 	// 对于InstanceMesh中的Mesh.Nodes，我们不应该序列化Props属性，因为Props是InstanceMesh的独立属性
-	MeshNodesMarshalForInstanceMesh(wt, instNd.Mesh.Nodes)
+	if err := MeshNodesMarshalForInstanceMesh(wt, instNd.Mesh.Nodes); err != nil {
+		return err
+	}
 	// V4及以上版本序列化Code字段
 	if v >= V4 {
-		writeLittleByte(wt, instNd.Mesh.Code)
+		if err := writeLittleByte(wt, instNd.Mesh.Code); err != nil {
+			return err
+		}
 	}
 	// V5 版本序列化新增属性
 	if v >= V5 {
@@ -560,15 +794,15 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) {
 		}
 		// 统一写入hasProps标记
 		if err := writeLittleUint32(wt, hasProps); err != nil {
-			return
+			return err
 		}
 		if hasProps == 1 {
 			if err := PropertiesMarshal(wt, instNd.Props); err != nil {
-				return
+				return err
 			}
 		}
 	}
-	writeLittleByte(wt, instNd.Hash)
+	return writeLittleByte(wt, instNd.Hash)
 }
 
 // MeshNodesUnMarshalForInstanceMesh 反序列化InstanceMesh中的MeshNode，不读取Props属性
@@ -668,8 +902,7 @@ func MeshWriteTo(path string, ms *Mesh) error {
 		return e
 	}
 	defer f.Close()
-	MeshMarshal(f, ms)
-	return nil
+	return MeshMarshal(f, ms)
 }
 
 func MeshNodesUnMarshalWithoutProps(rd io.Reader) []*MeshNode {
