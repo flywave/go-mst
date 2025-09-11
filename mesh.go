@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/gif"
@@ -275,8 +276,8 @@ type InstanceMesh struct {
 	Features  []uint64
 	BBox      *[6]float64
 	Mesh      *BaseMesh
-	Hash      uint64
 	Props     *Properties `json:"props,omitempty"`
+	Hash      uint64
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
@@ -356,8 +357,8 @@ func writeLittleByte(wt io.Writer, v interface{}) {
 	}
 }
 
-func readLittleByte(rd io.Reader, v interface{}) {
-	binary.Read(rd, binary.LittleEndian, v)
+func readLittleByte(rd io.Reader, v interface{}) error {
+	return binary.Read(rd, binary.LittleEndian, v)
 }
 
 func BaseMaterialMarshal(wt io.Writer, mtl *BaseMaterial) {
@@ -595,6 +596,36 @@ func MeshTriangleUnMarshal(rd io.Reader) *MeshTriangle {
 	return &nd
 }
 
+// 辅助函数：写入小端格式的uint32
+func writeLittleUint32(w io.Writer, v uint32) error {
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], v)
+	_, err := w.Write(buf[:])
+	return err
+}
+
+// 辅助函数：写入小端格式的int64
+func writeLittleInt64(w io.Writer, v int64) error {
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], uint64(v))
+	_, err := w.Write(buf[:])
+	return err
+}
+
+// 辅助函数：写入小端格式的float64
+func writeLittleFloat64(w io.Writer, v float64) error {
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], math.Float64bits(v))
+	_, err := w.Write(buf[:])
+	return err
+}
+
+// 辅助函数：写入小端格式的uint8
+func writeLittleUint8(w io.Writer, v uint8) error {
+	_, err := w.Write([]byte{v})
+	return err
+}
+
 func MeshOutlineMarshal(wt io.Writer, nd *MeshOutline) {
 	writeLittleByte(wt, nd.Batchid)
 	writeLittleByte(wt, uint32(len(nd.Edges)))
@@ -653,9 +684,10 @@ func MeshNodeMarshal(wt io.Writer, nd *MeshNode) {
 		MeshOutlineMarshal(wt, eg)
 	}
 	// V5 版本序列化新增属性
-	if nd.Props != nil {
+	if nd.Props != nil && len(*nd.Props) > 0 {
 		PropertiesMarshal(wt, nd.Props)
 	} else {
+		// 如果Props为nil，写入size为0
 		writeLittleByte(wt, uint32(0))
 	}
 }
@@ -717,6 +749,17 @@ func MeshNodesMarshal(wt io.Writer, nds []*MeshNode) {
 	}
 }
 
+func MeshNodesMarshalWithVersion(wt io.Writer, nds []*MeshNode, v uint32) {
+	writeLittleByte(wt, uint32(len(nds)))
+	for _, nd := range nds {
+		if v >= V5 {
+			MeshNodeMarshal(wt, nd)
+		} else {
+			MeshNodeMarshalWithoutProps(wt, nd)
+		}
+	}
+}
+
 func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 	var size uint32
 	readLittleByte(rd, &size)
@@ -730,22 +773,25 @@ func MeshNodesUnMarshal(rd io.Reader) []*MeshNode {
 func MeshMarshal(wt io.Writer, ms *Mesh) {
 	wt.Write([]byte(MESH_SIGNATURE))
 	writeLittleByte(wt, ms.Version)
-	baseMeshMarshal(wt, &ms.BaseMesh, ms.Version)
-	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
+	// V4及以上版本序列化Code字段
 	if ms.Version >= V4 {
-		writeLittleByte(wt, ms.Code)
+		writeLittleByte(wt, ms.BaseMesh.Code)
 	}
+	MtlsMarshal(wt, ms.Materials, ms.Version)
+	MeshNodesMarshalWithVersion(wt, ms.Nodes, ms.Version)
+	MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version)
 	// V5 版本序列化新增属性
 	if ms.Version >= V5 {
-		PropertiesMarshal(wt, ms.Props)
-	}
-}
-
-func baseMeshMarshal(wt io.Writer, ms *BaseMesh, v uint32) {
-	MtlsMarshal(wt, ms.Materials, v)
-	MeshNodesMarshal(wt, ms.Nodes)
-	if v == V4 {
-		writeLittleByte(wt, ms.Code)
+		if ms.Props != nil && len(*ms.Props) > 0 {
+			// 先写入标记位1表示有Properties
+			writeLittleByte(wt, uint32(1))
+			if err := PropertiesMarshal(wt, ms.Props); err != nil {
+				return
+			}
+		} else {
+			// 如果Props为nil，写入标记位0
+			writeLittleByte(wt, uint32(0))
+		}
 	}
 }
 
@@ -754,32 +800,90 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	sig := make([]byte, 4)
 	rd.Read(sig)
 	readLittleByte(rd, &ms.Version)
-	ms.BaseMesh = *baseMeshUnMarshal(rd, ms.Version)
-	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
+	// V4及以上版本反序列化Code字段
 	if ms.Version >= V4 {
-		readLittleByte(rd, &ms.Code)
+		var code uint32
+		readLittleByte(rd, &code)
+		ms.BaseMesh.Code = code
 	}
+	ms.Materials = MtlsUnMarshal(rd, ms.Version)
+	// 对于Mesh中的Mesh.Nodes，我们应该使用带版本的函数来正确处理Props字段
+	if ms.Version >= V5 {
+		ms.Nodes = MeshNodesUnMarshalWithVersion(rd, ms.Version)
+	} else {
+		ms.Nodes = MeshNodesUnMarshal(rd)
+	}
+	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
 	// V5 版本反序列化新增属性
 	if ms.Version >= V5 {
-		ms.Props = PropertiesUnMarshal(rd)
+		var hasProps uint32
+		if err := readLittleByte(rd, &hasProps); err != nil {
+			return nil
+		}
+		if hasProps > 0 {
+			ms.Props = PropertiesUnMarshal(rd)
+			if ms.Props == nil {
+				return nil
+			}
+		} else {
+			ms.Props = nil
+		}
 	}
 	return &ms
-}
-
-func baseMeshUnMarshal(rd io.Reader, v uint32) *BaseMesh {
-	ms := &BaseMesh{}
-	ms.Materials = MtlsUnMarshal(rd, v)
-	ms.Nodes = MeshNodesUnMarshal(rd)
-	if v == V4 {
-		readLittleByte(rd, &ms.Code)
-	}
-	return ms
 }
 
 func MeshInstanceNodesMarshal(wt io.Writer, instNd []*InstanceMesh, v uint32) {
 	writeLittleByte(wt, uint32(len(instNd)))
 	for _, nd := range instNd {
 		MeshInstanceNodeMarshal(wt, nd, v)
+	}
+}
+
+// MeshNodesMarshalForInstanceMesh 序列化InstanceMesh中的MeshNode，不序列化Props属性
+func MeshNodesMarshalForInstanceMesh(wt io.Writer, nds []*MeshNode) {
+	writeLittleByte(wt, uint32(len(nds)))
+	for _, nd := range nds {
+		MeshNodeMarshalWithoutProps(wt, nd)
+	}
+}
+
+// MeshNodeMarshalWithoutProps 序列化MeshNode，不序列化Props属性
+func MeshNodeMarshalWithoutProps(wt io.Writer, nd *MeshNode) {
+	writeLittleByte(wt, uint32(len(nd.Vertices)))
+	for i := range nd.Vertices {
+		writeLittleByte(wt, nd.Vertices[i][:])
+	}
+	writeLittleByte(wt, uint32(len(nd.Normals)))
+	for i := range nd.Normals {
+		writeLittleByte(wt, nd.Normals[i][:])
+	}
+	writeLittleByte(wt, uint32(len(nd.Colors)))
+	for i := range nd.Colors {
+		writeLittleByte(wt, nd.Colors[i][:])
+
+	}
+	writeLittleByte(wt, uint32(len(nd.TexCoords)))
+	for i := range nd.TexCoords {
+		writeLittleByte(wt, nd.TexCoords[i][:])
+	}
+	if nd.Mat != nil {
+		writeLittleByte(wt, uint8(1))
+		writeLittleByte(wt, nd.Mat[0][:])
+		writeLittleByte(wt, nd.Mat[1][:])
+		writeLittleByte(wt, nd.Mat[2][:])
+		writeLittleByte(wt, nd.Mat[3][:])
+	} else {
+		writeLittleByte(wt, uint8(0))
+	}
+
+	writeLittleByte(wt, uint32(len(nd.FaceGroup)))
+	for _, fg := range nd.FaceGroup {
+		MeshTriangleMarshal(wt, fg)
+	}
+
+	writeLittleByte(wt, uint32(len(nd.EdgeGroup)))
+	for _, eg := range nd.EdgeGroup {
+		MeshOutlineMarshal(wt, eg)
 	}
 }
 
@@ -796,20 +900,41 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) {
 		writeLittleByte(wt, f)
 	}
 	writeLittleByte(wt, instNd.BBox)
-	baseMeshMarshal(wt, instNd.Mesh, v)
-	writeLittleByte(wt, instNd.Hash)
+	// 序列化Mesh字段
+	MtlsMarshal(wt, instNd.Mesh.Materials, v)
+	// 修复：使用正确的函数来序列化Mesh.Nodes，确保Props字段能被正确处理
+	// 对于InstanceMesh中的Mesh.Nodes，我们不应该序列化Props属性，因为Props是InstanceMesh的独立属性
+	MeshNodesMarshalForInstanceMesh(wt, instNd.Mesh.Nodes)
+	// V4及以上版本序列化Code字段
+	if v >= V4 {
+		writeLittleByte(wt, instNd.Mesh.Code)
+	}
 	// V5 版本序列化新增属性
 	if v >= V5 {
-		PropertiesMarshal(wt, instNd.Props)
+		var hasProps uint32 = 0
+		if instNd.Props != nil && len(*instNd.Props) > 0 {
+			hasProps = 1
+		}
+		// 统一写入hasProps标记
+		if err := writeLittleUint32(wt, hasProps); err != nil {
+			return
+		}
+		if hasProps == 1 {
+			if err := PropertiesMarshal(wt, instNd.Props); err != nil {
+				return
+			}
+		}
 	}
+	writeLittleByte(wt, instNd.Hash)
 }
 
-func MeshInstanceNodesUnMarshal(rd io.Reader, v uint32) []*InstanceMesh {
+// MeshNodesUnMarshalForInstanceMesh 反序列化InstanceMesh中的MeshNode，不读取Props属性
+func MeshNodesUnMarshalForInstanceMesh(rd io.Reader) []*MeshNode {
 	var size uint32
 	readLittleByte(rd, &size)
-	nds := make([]*InstanceMesh, size)
+	nds := make([]*MeshNode, size)
 	for i := range nds {
-		nds[i] = MeshInstanceNodeUnMarshal(rd, v)
+		nds[i] = MeshNodeUnMarshalWithoutProps(rd)
 	}
 	return nds
 }
@@ -842,12 +967,46 @@ func MeshInstanceNodeUnMarshal(rd io.Reader, v uint32) *InstanceMesh {
 
 	inst.BBox = &[6]float64{}
 	readLittleByte(rd, inst.BBox)
-	inst.Mesh = baseMeshUnMarshal(rd, v)
-	readLittleByte(rd, &inst.Hash)
-	if v >= V5 {
-		inst.Props = PropertiesUnMarshal(rd)
+	// 反序列化Mesh字段
+	inst.Mesh = &BaseMesh{}
+	inst.Mesh.Materials = MtlsUnMarshal(rd, v)
+	// 修复：使用正确的函数来反序列化Mesh.Nodes，确保Props字段能被正确处理
+	// 对于InstanceMesh中的Mesh.Nodes，我们不应该读取Props属性，因为Props是InstanceMesh的独立属性
+	inst.Mesh.Nodes = MeshNodesUnMarshalForInstanceMesh(rd)
+	// V4及以上版本反序列化Code字段
+	if v >= V4 {
+		readLittleByte(rd, &inst.Mesh.Code)
 	}
+	// V5 版本反序列化新增属性
+	if v >= V5 {
+		var hasProps uint32
+		if err := readLittleByte(rd, &hasProps); err != nil {
+			return nil
+		}
+		if hasProps > 0 {
+			inst.Props = PropertiesUnMarshal(rd)
+			if inst.Props == nil {
+				return nil
+			}
+		} else {
+			inst.Props = nil
+		}
+	} else {
+		// For versions less than V5, ensure Props is nil
+		inst.Props = nil
+	}
+	readLittleByte(rd, &inst.Hash)
 	return inst
+}
+
+func MeshInstanceNodesUnMarshal(rd io.Reader, v uint32) []*InstanceMesh {
+	var size uint32
+	readLittleByte(rd, &size)
+	nds := make([]*InstanceMesh, size)
+	for i := range nds {
+		nds[i] = MeshInstanceNodeUnMarshal(rd, v)
+	}
+	return nds
 }
 
 func MeshReadFrom(path string) (*Mesh, error) {
@@ -1006,53 +1165,229 @@ type PropsValue struct {
 type Properties map[string]PropsValue
 
 // PropertiesMarshal 序列化Properties
-func PropertiesMarshal(wt io.Writer, props *Properties) {
-	if props == nil {
-		writeLittleByte(wt, uint32(0))
-		return
-	}
-
-	writeLittleByte(wt, uint32(len(*props)))
-	for key, value := range *props {
-		// 写入key
-		writeLittleByte(wt, uint32(len(key)))
-		wt.Write([]byte(key))
-
-		// 写入类型
-		writeLittleByte(wt, uint32(value.Type))
-
-		// 根据类型写入值
+func PropertiesMarshal(wt io.Writer, props *Properties) error {
+	// 嵌套函数：序列化单个PropsValue
+	marshalPropsValue := func(wt io.Writer, value PropsValue) error {
 		switch value.Type {
 		case PROP_TYPE_STRING:
 			str := value.Value.(string)
-			writeLittleByte(wt, uint32(len(str)))
-			wt.Write([]byte(str))
+			if err := writeLittleUint32(wt, uint32(len(str))); err != nil {
+				return fmt.Errorf("write string len failed: %w", err)
+			}
+			if _, err := wt.Write([]byte(str)); err != nil {
+				return fmt.Errorf("write string content failed: %w", err)
+			}
 		case PROP_TYPE_INT:
-			writeLittleByte(wt, value.Value.(int64))
+			intVal := value.Value.(int64)
+			if err := writeLittleInt64(wt, intVal); err != nil {
+				return fmt.Errorf("write int64 failed: %w", err)
+			}
 		case PROP_TYPE_FLOAT:
-			writeLittleByte(wt, value.Value.(float64))
+			floatVal := value.Value.(float64)
+			if err := writeLittleFloat64(wt, floatVal); err != nil {
+				return fmt.Errorf("write float64 failed: %w", err)
+			}
 		case PROP_TYPE_BOOL:
+			val := uint8(0)
 			if value.Value.(bool) {
-				writeLittleByte(wt, uint8(1))
-			} else {
-				writeLittleByte(wt, uint8(0))
+				val = 1
+			}
+			if err := writeLittleUint8(wt, val); err != nil {
+				return fmt.Errorf("write bool failed: %w", err)
 			}
 		case PROP_TYPE_ARRAY:
 			arr := value.Value.([]PropsValue)
-			writeLittleByte(wt, uint32(len(arr)))
+			if err := writeLittleUint32(wt, uint32(len(arr))); err != nil {
+				return fmt.Errorf("write array len failed: %w", err)
+			}
 			for _, item := range arr {
-				writeLittleByte(wt, uint32(item.Type))
-				marshalPropsValue(wt, item)
+				if err := writeLittleUint32(wt, uint32(item.Type)); err != nil {
+					return fmt.Errorf("write array item type failed: %w", err)
+				}
+				if err := marshalPropsValue(wt, item); err != nil {
+					return fmt.Errorf("write array item failed: %w", err)
+				}
 			}
 		case PROP_TYPE_MAP:
 			subProps := value.Value.(Properties)
-			PropertiesMarshal(wt, &subProps)
+			if err := PropertiesMarshal(wt, &subProps); err != nil {
+				return fmt.Errorf("write map properties failed: %w", err)
+			}
 		}
+		return nil
+	}
+
+	if props == nil {
+		if err := writeLittleUint32(wt, 0); err != nil {
+			return fmt.Errorf("write nil marker failed: %w", err)
+		}
+		return nil
+	}
+
+	// 写入Properties数量
+	propsCount := uint32(len(*props))
+	if err := writeLittleUint32(wt, propsCount); err != nil {
+		return fmt.Errorf("write properties count failed: %w", err)
+	}
+
+	for key, value := range *props {
+		// 写入key长度
+		keyLen := uint32(len(key))
+		if err := writeLittleUint32(wt, keyLen); err != nil {
+			return fmt.Errorf("write key len failed: %w", err)
+		}
+		// 写入key内容
+		if _, err := wt.Write([]byte(key)); err != nil {
+			return fmt.Errorf("write key content failed: %w", err)
+		}
+
+		// 写入类型
+		if err := writeLittleUint32(wt, uint32(value.Type)); err != nil {
+			return fmt.Errorf("write value type failed: %w", err)
+		}
+
+		// 根据类型写入值
+		if err := marshalPropsValue(wt, value); err != nil {
+			return fmt.Errorf("write value failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// PropertiesUnMarshal 反序列化Properties
+func PropertiesUnMarshal(rd io.Reader) *Properties {
+	// 读取Properties数量
+	var size uint32
+	if err := readLittleByte(rd, &size); err != nil {
+		return nil
+	}
+
+	// 安全检查
+	if size > 1000 { // 设置合理的上限
+		return nil
+	}
+
+	props := make(Properties)
+	for i := uint32(0); i < size; i++ {
+		// 读取key长度
+		var keyLen uint32
+		if err := readLittleByte(rd, &keyLen); err != nil {
+			return nil
+		}
+
+		// 安全检查
+		if keyLen > 100 { // 设置合理的key长度上限
+			return nil
+		}
+
+		// 读取key内容
+		keyBytes := make([]byte, keyLen)
+		if _, err := io.ReadFull(rd, keyBytes); err != nil {
+			return nil
+		}
+		key := string(keyBytes)
+
+		// 读取类型
+		var propType uint32
+		if err := readLittleByte(rd, &propType); err != nil {
+			return nil
+		}
+
+		// 根据类型读取值
+		value := unmarshalPropsValue(rd, PropsType(propType))
+		if value.Type == -1 { // 表示反序列化失败
+			return nil
+		}
+
+		// 类型验证
+		if uint32(value.Type) != propType {
+			return nil
+		}
+
+		props[key] = value
+	}
+
+	return &props
+}
+
+// 辅助函数，用于反序列化单个PropsValue
+func unmarshalPropsValue(rd io.Reader, propType PropsType) PropsValue {
+	var value interface{}
+	var err error
+
+	switch propType {
+	case PROP_TYPE_STRING:
+		var strLen uint32
+		if err = readLittleByte(rd, &strLen); err != nil {
+			return PropsValue{Type: -1}
+		}
+		// 添加安全检查
+		if strLen > 100000 {
+			return PropsValue{Type: -1}
+		}
+		strBytes := make([]byte, strLen)
+		if _, err = io.ReadFull(rd, strBytes); err != nil {
+			return PropsValue{Type: -1}
+		}
+		value = string(strBytes)
+	case PROP_TYPE_INT:
+		var intVal int64
+		if err = readLittleByte(rd, &intVal); err != nil {
+			return PropsValue{Type: -1}
+		}
+		value = intVal
+	case PROP_TYPE_FLOAT:
+		var floatVal float64
+		if err = readLittleByte(rd, &floatVal); err != nil {
+			return PropsValue{Type: -1}
+		}
+		value = floatVal
+	case PROP_TYPE_BOOL:
+		var boolVal uint8
+		if err = readLittleByte(rd, &boolVal); err != nil {
+			return PropsValue{Type: -1}
+		}
+		value = boolVal == 1
+	case PROP_TYPE_ARRAY:
+		var arrLen uint32
+		if err = readLittleByte(rd, &arrLen); err != nil {
+			return PropsValue{Type: -1}
+		}
+		// 添加安全检查
+		if arrLen > 100000 {
+			return PropsValue{Type: -1}
+		}
+		arr := make([]PropsValue, arrLen)
+		for i := uint32(0); i < arrLen; i++ {
+			var itemType uint32
+			if err = readLittleByte(rd, &itemType); err != nil {
+				return PropsValue{Type: -1}
+			}
+			arr[i] = unmarshalPropsValue(rd, PropsType(itemType))
+			if arr[i].Type == -1 {
+				return PropsValue{Type: -1}
+			}
+		}
+		value = arr
+	case PROP_TYPE_MAP:
+		subProps := PropertiesUnMarshal(rd)
+		if subProps != nil {
+			value = *subProps
+		} else {
+			value = make(Properties)
+		}
+	default:
+		return PropsValue{Type: -1}
+	}
+
+	return PropsValue{
+		Type:  propType,
+		Value: value,
 	}
 }
 
 // 辅助函数，用于序列化单个PropsValue
-func marshalPropsValue(wt io.Writer, value PropsValue) {
+func marshalPropsValue(wt io.Writer, value PropsValue) error {
 	switch value.Type {
 	case PROP_TYPE_STRING:
 		str := value.Value.(string)
@@ -1079,81 +1414,138 @@ func marshalPropsValue(wt io.Writer, value PropsValue) {
 		subProps := value.Value.(Properties)
 		PropertiesMarshal(wt, &subProps)
 	}
+	return nil
 }
 
-// PropertiesUnMarshal 反序列化Properties
-func PropertiesUnMarshal(rd io.Reader) *Properties {
+func MeshNodesUnMarshalWithoutProps(rd io.Reader) []*MeshNode {
 	var size uint32
 	readLittleByte(rd, &size)
-
-	if size == 0 {
-		return nil
+	nds := make([]*MeshNode, size)
+	for i := range nds {
+		nds[i] = MeshNodeUnMarshalWithoutProps(rd)
 	}
-
-	props := make(Properties)
-	for i := uint32(0); i < size; i++ {
-		// 读取key
-		var keyLen uint32
-		readLittleByte(rd, &keyLen)
-		keyBytes := make([]byte, keyLen)
-		rd.Read(keyBytes)
-		key := string(keyBytes)
-
-		// 读取类型
-		var propType uint32
-		readLittleByte(rd, &propType)
-
-		// 根据类型读取值
-		props[key] = unmarshalPropsValue(rd, PropsType(propType))
-	}
-
-	return &props
+	return nds
 }
 
-// 辅助函数，用于反序列化单个PropsValue
-func unmarshalPropsValue(rd io.Reader, propType PropsType) PropsValue {
-	var value interface{}
-
-	switch propType {
-	case PROP_TYPE_STRING:
-		var strLen uint32
-		readLittleByte(rd, &strLen)
-		strBytes := make([]byte, strLen)
-		rd.Read(strBytes)
-		value = string(strBytes)
-	case PROP_TYPE_INT:
-		var intVal int64
-		readLittleByte(rd, &intVal)
-		value = intVal
-	case PROP_TYPE_FLOAT:
-		var floatVal float64
-		readLittleByte(rd, &floatVal)
-		value = floatVal
-	case PROP_TYPE_BOOL:
-		var boolVal uint8
-		readLittleByte(rd, &boolVal)
-		value = boolVal == 1
-	case PROP_TYPE_ARRAY:
-		var arrLen uint32
-		readLittleByte(rd, &arrLen)
-		arr := make([]PropsValue, arrLen)
-		for i := uint32(0); i < arrLen; i++ {
-			var itemType uint32
-			readLittleByte(rd, &itemType)
-			arr[i] = unmarshalPropsValue(rd, PropsType(itemType))
-		}
-		value = arr
-	case PROP_TYPE_MAP:
-		subProps := PropertiesUnMarshal(rd)
-		if subProps != nil {
-			value = *subProps
-		} else {
-			value = make(Properties)
-		}
+func MeshNodeUnMarshalWithoutProps(rd io.Reader) *MeshNode {
+	nd := MeshNode{}
+	var size uint32
+	readLittleByte(rd, &size)
+	nd.Vertices = make([]vec3.T, size)
+	for i := range nd.Vertices {
+		readLittleByte(rd, nd.Vertices[i][:])
+	}
+	readLittleByte(rd, &size)
+	nd.Normals = make([]vec3.T, size)
+	for i := range nd.Normals {
+		readLittleByte(rd, nd.Normals[i][:])
+	}
+	// 修复：重新读取颜色数组大小
+	var colorSize uint32
+	readLittleByte(rd, &colorSize)
+	nd.Colors = make([][3]byte, colorSize)
+	for i := range nd.Colors {
+		readLittleByte(rd, nd.Colors[i][:])
 	}
 
-	return PropsValue{
-		Type:  propType,
-		Value: value,
+	// 修复：重新读取纹理坐标数组大小
+	var texCoordSize uint32
+	readLittleByte(rd, &texCoordSize)
+	nd.TexCoords = make([]vec2.T, texCoordSize)
+	for i := range nd.TexCoords {
+		readLittleByte(rd, &nd.TexCoords[i])
 	}
+	var isMat uint8
+	readLittleByte(rd, &isMat)
+	if isMat == 1 {
+		nd.Mat = &dmat.T{}
+		readLittleByte(rd, nd.Mat[0][:])
+		readLittleByte(rd, nd.Mat[1][:])
+		readLittleByte(rd, nd.Mat[2][:])
+		readLittleByte(rd, nd.Mat[3][:])
+	}
+
+	readLittleByte(rd, &size)
+	nd.FaceGroup = make([]*MeshTriangle, size)
+	for i := 0; i < int(size); i++ {
+		nd.FaceGroup[i] = MeshTriangleUnMarshal(rd)
+	}
+
+	readLittleByte(rd, &size)
+	nd.EdgeGroup = make([]*MeshOutline, size)
+	for i := 0; i < int(size); i++ {
+		nd.EdgeGroup[i] = MeshOutlineUnMarshal(rd)
+	}
+
+	nd.Props = nil
+	return &nd
+}
+
+func MeshNodesUnMarshalWithVersion(rd io.Reader, v uint32) []*MeshNode {
+	var size uint32
+	readLittleByte(rd, &size)
+	nds := make([]*MeshNode, size)
+	for i := range nds {
+		nds[i] = MeshNodeUnMarshalWithVersion(rd, v)
+	}
+	return nds
+}
+
+func MeshNodeUnMarshalWithVersion(rd io.Reader, v uint32) *MeshNode {
+	nd := MeshNode{}
+	var size uint32
+	readLittleByte(rd, &size)
+	nd.Vertices = make([]vec3.T, size)
+	for i := range nd.Vertices {
+		readLittleByte(rd, nd.Vertices[i][:])
+	}
+	readLittleByte(rd, &size)
+	nd.Normals = make([]vec3.T, size)
+	for i := range nd.Normals {
+		readLittleByte(rd, nd.Normals[i][:])
+	}
+	// 修复：重新读取颜色数组大小
+	var colorSize uint32
+	readLittleByte(rd, &colorSize)
+	nd.Colors = make([][3]byte, colorSize)
+	for i := range nd.Colors {
+		readLittleByte(rd, nd.Colors[i][:])
+	}
+
+	// 修复：重新读取纹理坐标数组大小
+	var texCoordSize uint32
+	readLittleByte(rd, &texCoordSize)
+	nd.TexCoords = make([]vec2.T, texCoordSize)
+	for i := range nd.TexCoords {
+		readLittleByte(rd, &nd.TexCoords[i])
+	}
+	var isMat uint8
+	readLittleByte(rd, &isMat)
+	if isMat == 1 {
+		nd.Mat = &dmat.T{}
+		readLittleByte(rd, nd.Mat[0][:])
+		readLittleByte(rd, nd.Mat[1][:])
+		readLittleByte(rd, nd.Mat[2][:])
+		readLittleByte(rd, nd.Mat[3][:])
+	}
+
+	readLittleByte(rd, &size)
+	nd.FaceGroup = make([]*MeshTriangle, size)
+	for i := 0; i < int(size); i++ {
+		nd.FaceGroup[i] = MeshTriangleUnMarshal(rd)
+	}
+
+	readLittleByte(rd, &size)
+	nd.EdgeGroup = make([]*MeshOutline, size)
+	for i := 0; i < int(size); i++ {
+		nd.EdgeGroup[i] = MeshOutlineUnMarshal(rd)
+	}
+
+	// V5 版本反序列化新增属性
+	if v >= V5 {
+		nd.Props = PropertiesUnMarshal(rd)
+	} else {
+		nd.Props = nil
+	}
+	return &nd
 }

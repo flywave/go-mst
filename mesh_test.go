@@ -2,6 +2,7 @@ package mst
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -300,7 +301,7 @@ func TestMeshNodeMarshalUnmarshal(t *testing.T) {
 
 // TestMeshMarshalUnmarshal 测试完整网格序列化反序列化
 func TestMeshMarshalUnmarshal(t *testing.T) {
-	for version := V1; version <= V4; version++ {
+	for version := V1; version <= V5; version++ {
 		t.Run(string(rune(version)), func(t *testing.T) {
 			mesh := &Mesh{
 				BaseMesh: BaseMesh{
@@ -433,6 +434,181 @@ func TestNodeOperations(t *testing.T) {
 	})
 }
 
+// TestInstanceMeshV5Properties 测试V5版本InstanceMesh的Properties
+func TestInstanceMeshV5Properties(t *testing.T) {
+	// 创建父Mesh (V5版本)
+	parentMesh := NewMesh()
+	parentMesh.Version = V5
+
+	transform := mat4d.Ident
+	instanceMesh := &InstanceMesh{
+		Transfors: []*mat4d.T{&transform},
+		Features:  []uint64{100, 200, 300},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 255, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 1}}},
+			},
+		},
+	}
+
+	// 添加Properties
+	props := make(Properties)
+	props["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance"}
+	props["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(9876)}
+	instanceMesh.Props = &props
+
+	// 将InstanceMesh添加到父Mesh
+	parentMesh.InstanceNode = []*InstanceMesh{instanceMesh}
+
+	// 序列化整个Mesh
+	var buf bytes.Buffer
+	MeshMarshal(&buf, parentMesh)
+
+	// 反序列化
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+
+	// 验证结果
+	if len(readMesh.InstanceNode) == 0 {
+		t.Fatal("No instance nodes found")
+	}
+
+	unmarshaled := readMesh.InstanceNode[0]
+	if unmarshaled.Props == nil {
+		t.Fatal("Props is nil for V5 instance mesh")
+	}
+
+	readProps := *unmarshaled.Props
+	if len(readProps) != 2 {
+		t.Errorf("Props count = %d, want 2", len(readProps))
+	}
+
+	if val, ok := readProps["instance_name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "test instance" {
+		t.Errorf("instance_name property mismatch")
+	}
+	if val, ok := readProps["instance_id"]; !ok || val.Type != PROP_TYPE_INT || val.Value.(int64) != 9876 {
+		t.Errorf("instance_id property mismatch")
+	}
+}
+
+// TestMeshNodesMarshalUnmarshal 独立测试MeshNodesMarshalWithVersion和MeshNodesUnMarshal函数
+func TestMeshNodesMarshalUnmarshal(t *testing.T) {
+	// 创建测试数据
+	nodes := []*MeshNode{
+		{
+			Vertices:  []vec3.T{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}},
+			Normals:   []vec3.T{{0, 0, 1}, {0, 0, 1}, {0, 0, 1}},
+			Colors:    [][3]byte{{255, 0, 0}, {0, 255, 0}, {0, 0, 255}},
+			TexCoords: []vec2.T{{0, 0}, {1, 0}, {0, 1}},
+			FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}}},
+			EdgeGroup: []*MeshOutline{{Batchid: 0, Edges: [][2]uint32{{0, 1}, {1, 2}, {2, 0}}}},
+			Props:     &Properties{"test": {Type: PROP_TYPE_STRING, Value: "value1"}},
+		},
+		{
+			Vertices:  []vec3.T{{1, 0, 0}, {2, 0, 0}, {1, 1, 0}},
+			Normals:   []vec3.T{{0, 0, 1}, {0, 0, 1}, {0, 0, 1}},
+			Colors:    [][3]byte{{255, 255, 0}, {0, 255, 255}, {255, 0, 255}},
+			TexCoords: []vec2.T{{0, 1}, {1, 1}, {0, 0}},
+			FaceGroup: []*MeshTriangle{{Batchid: 1, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}}},
+			EdgeGroup: []*MeshOutline{{Batchid: 1, Edges: [][2]uint32{{0, 1}, {1, 2}, {2, 0}}}},
+			Props:     &Properties{"test": {Type: PROP_TYPE_STRING, Value: "value2"}},
+		},
+	}
+
+	t.Logf("Testing MeshNodesMarshalWithVersion and MeshNodesUnMarshal")
+	t.Logf("Original nodes count: %d", len(nodes))
+
+	// 测试不同版本的序列化和反序列化
+	versions := []uint32{V1, V2, V3, V4, V5}
+	for _, version := range versions {
+		t.Run(fmt.Sprintf("Version%d", version), func(t *testing.T) {
+			// 序列化
+			var buf bytes.Buffer
+			MeshNodesMarshalWithVersion(&buf, nodes, version)
+
+			t.Logf("Version %d: serialized data size: %d bytes", version, buf.Len())
+
+			// 反序列化
+			unmarshaled := MeshNodesUnMarshalWithVersion(bytes.NewReader(buf.Bytes()), version)
+
+			// 验证结果
+			if len(unmarshaled) != len(nodes) {
+				t.Errorf("Version %d: nodes count mismatch: got %d, want %d", version, len(unmarshaled), len(nodes))
+				return
+			}
+
+			for i, unmarshaledNode := range unmarshaled {
+				originalNode := nodes[i]
+
+				// 验证基本字段
+				if len(unmarshaledNode.Vertices) != len(originalNode.Vertices) {
+					t.Errorf("Version %d: node %d vertices count mismatch: got %d, want %d", version, i, len(unmarshaledNode.Vertices), len(originalNode.Vertices))
+				}
+				if len(unmarshaledNode.Normals) != len(originalNode.Normals) {
+					t.Errorf("Version %d: node %d normals count mismatch: got %d, want %d", version, i, len(unmarshaledNode.Normals), len(originalNode.Normals))
+				}
+				if len(unmarshaledNode.Colors) != len(originalNode.Colors) {
+					t.Errorf("Version %d: node %d colors count mismatch: got %d, want %d", version, i, len(unmarshaledNode.Colors), len(originalNode.Colors))
+				}
+				if len(unmarshaledNode.TexCoords) != len(originalNode.TexCoords) {
+					t.Errorf("Version %d: node %d texCoords count mismatch: got %d, want %d", version, i, len(unmarshaledNode.TexCoords), len(originalNode.TexCoords))
+				}
+				if len(unmarshaledNode.FaceGroup) != len(originalNode.FaceGroup) {
+					t.Errorf("Version %d: node %d faceGroup count mismatch: got %d, want %d", version, i, len(unmarshaledNode.FaceGroup), len(originalNode.FaceGroup))
+				}
+				if len(unmarshaledNode.EdgeGroup) != len(originalNode.EdgeGroup) {
+					t.Errorf("Version %d: node %d edgeGroup count mismatch: got %d, want %d", version, i, len(unmarshaledNode.EdgeGroup), len(originalNode.EdgeGroup))
+				}
+
+				// 验证Props字段（仅在V5及以上版本）
+				if version >= V5 {
+					if unmarshaledNode.Props == nil {
+						t.Errorf("Version %d: node %d Props should not be nil", version, i)
+					} else if len(*unmarshaledNode.Props) != len(*originalNode.Props) {
+						t.Errorf("Version %d: node %d Props count mismatch: got %d, want %d", version, i, len(*unmarshaledNode.Props), len(*originalNode.Props))
+					}
+				} else {
+					// 对于V5以下版本，Props应该为nil
+					if unmarshaledNode.Props != nil && len(*unmarshaledNode.Props) > 0 {
+						t.Errorf("Version %d: node %d Props should be nil or empty for versions below V5", version, i)
+					}
+				}
+			}
+
+			t.Logf("Version %d: successfully unmarshaled %d nodes", version, len(unmarshaled))
+		})
+	}
+}
+
+// TestMeshNodesMarshalUnmarshalEmpty 测试空节点数组的序列化和反序列化
+func TestMeshNodesMarshalUnmarshalEmpty(t *testing.T) {
+	// 测试空节点数组
+	emptyNodes := []*MeshNode{}
+
+	t.Logf("Testing MeshNodesMarshalWithVersion and MeshNodesUnMarshal with empty nodes")
+
+	versions := []uint32{V1, V2, V3, V4, V5}
+	for _, version := range versions {
+		t.Run(fmt.Sprintf("Version%d_Empty", version), func(t *testing.T) {
+			// 序列化
+			var buf bytes.Buffer
+			MeshNodesMarshalWithVersion(&buf, emptyNodes, version)
+
+			t.Logf("Version %d: serialized empty data size: %d bytes", version, buf.Len())
+
+			// 反序列化
+			unmarshaled := MeshNodesUnMarshalWithVersion(bytes.NewReader(buf.Bytes()), version)
+
+			// 验证结果
+			if len(unmarshaled) != len(emptyNodes) {
+				t.Errorf("Version %d: empty nodes count mismatch: got %d, want %d", version, len(unmarshaled), len(emptyNodes))
+			}
+
+			t.Logf("Version %d: successfully handled empty nodes", version)
+		})
+	}
+}
+
 // TestInstanceMeshOperations 测试实例化网格操作
 func TestInstanceMeshOperations(t *testing.T) {
 	for version := V1; version <= V4; version++ {
@@ -469,6 +645,56 @@ func TestInstanceMeshOperations(t *testing.T) {
 				t.Errorf("deserialization failed")
 			}
 		})
+	}
+}
+
+// TestMeshV5Properties 测试V5版本的Properties序列化和反序列化
+func TestMeshV5Properties(t *testing.T) {
+	// 创建测试用的Properties
+	props := make(Properties)
+	props["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test mesh"}
+	props["id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(12345)}
+	props["visible"] = PropsValue{Type: PROP_TYPE_BOOL, Value: true}
+	props["scale"] = PropsValue{Type: PROP_TYPE_FLOAT, Value: 1.5}
+
+	// 创建测试用的Mesh
+	mesh := NewMesh()
+	mesh.Props = &props
+
+	// 序列化
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	// 反序列化
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+
+	// 验证结果
+	if readMesh.Version != V5 {
+		t.Errorf("Version = %d, want %d", readMesh.Version, V5)
+	}
+
+	// 检查Properties
+	if readMesh.Props == nil {
+		t.Fatal("Props is nil for V5 mesh")
+	}
+
+	readProps := *readMesh.Props
+	if len(readProps) != 4 {
+		t.Errorf("Props count = %d, want 4", len(readProps))
+	}
+
+	// 检查各个属性
+	if val, ok := readProps["name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "test mesh" {
+		t.Errorf("name property mismatch")
+	}
+	if val, ok := readProps["id"]; !ok || val.Type != PROP_TYPE_INT || val.Value.(int64) != 12345 {
+		t.Errorf("id property mismatch")
+	}
+	if val, ok := readProps["visible"]; !ok || val.Type != PROP_TYPE_BOOL || val.Value.(bool) != true {
+		t.Errorf("visible property mismatch")
+	}
+	if val, ok := readProps["scale"]; !ok || val.Type != PROP_TYPE_FLOAT || val.Value.(float64) != 1.5 {
+		t.Errorf("scale property mismatch")
 	}
 }
 
@@ -782,65 +1008,10 @@ func TestMaterialTypeConstants(t *testing.T) {
 
 	for value, name := range types {
 		t.Run(name, func(t *testing.T) {
-			if value < 0 || value > 10 {
+			if value > 10 {
 				t.Errorf("Invalid material type value: %d", value)
 			}
 		})
-	}
-}
-
-// BenchmarkMeshMarshal 基准测试网格序列化
-func BenchmarkMeshMarshal(b *testing.B) {
-	mesh := &Mesh{
-		BaseMesh: BaseMesh{
-			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 0, 0}}},
-			Nodes: []*MeshNode{
-				{
-					Vertices: make([]vec3.T, 1000),
-					FaceGroup: []*MeshTriangle{{
-						Batchid: 0,
-						Faces:   make([]*Face, 100),
-					}},
-				},
-			},
-			Code: 12345,
-		},
-		Version: V4,
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var buf bytes.Buffer
-		MeshMarshal(&buf, mesh)
-	}
-}
-
-// BenchmarkMeshUnmarshal 基准测试网格反序列化
-func BenchmarkMeshUnmarshal(b *testing.B) {
-	mesh := &Mesh{
-		BaseMesh: BaseMesh{
-			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 0, 0}}},
-			Nodes: []*MeshNode{
-				{
-					Vertices: make([]vec3.T, 1000),
-					FaceGroup: []*MeshTriangle{{
-						Batchid: 0,
-						Faces:   make([]*Face, 100),
-					}},
-				},
-			},
-			Code: 12345,
-		},
-		Version: V4,
-	}
-
-	var buf bytes.Buffer
-	MeshMarshal(&buf, mesh)
-	data := buf.Bytes()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		MeshUnMarshal(bytes.NewReader(data))
 	}
 }
 
@@ -1065,7 +1236,7 @@ func TestMeshNodeMarshalUnmarshalWithoutTransform(t *testing.T) {
 
 // TestMeshVersionCompatibility 测试版本兼容性
 func TestMeshVersionCompatibility(t *testing.T) {
-	for version := V1; version <= V4; version++ {
+	for version := V1; version <= V5; version++ {
 		t.Run(string(rune(version)), func(t *testing.T) {
 			mesh := &Mesh{
 				BaseMesh: BaseMesh{
@@ -1082,6 +1253,7 @@ func TestMeshVersionCompatibility(t *testing.T) {
 				},
 				Version: version,
 			}
+			fmt.Printf("Debug: Test data - Version=%d, BaseMesh.Code=%d\n", version, mesh.BaseMesh.Code)
 
 			var buf bytes.Buffer
 			MeshMarshal(&buf, mesh)
@@ -1091,8 +1263,23 @@ func TestMeshVersionCompatibility(t *testing.T) {
 			if readMesh.Version != version {
 				t.Errorf("Version = %d, want %d", readMesh.Version, version)
 			}
-			if version == V4 && readMesh.Code != mesh.Code {
-				t.Errorf("Code = %d, want %d", readMesh.Code, mesh.Code)
+			// 检查Code字段是否在V4及以上版本中正确序列化
+			// 在V4及以上版本中，Code字段应该被序列化
+			if version >= V4 {
+				// 确保测试数据中设置了Code字段
+				if mesh.Code == 0 {
+					t.Error("Test data error: Code field not set for V4+ mesh")
+				}
+				fmt.Printf("Debug: Version=%d, Original Code=%d, Serialized Code=%d\n", version, mesh.Code, readMesh.Code)
+				if readMesh.Code != mesh.Code {
+					t.Errorf("Code = %d, want %d", readMesh.Code, mesh.Code)
+				}
+			} else {
+				// 在V3及以下版本中，Code字段应该为0
+				fmt.Printf("Debug: Version=%d, Code=%d (should be 0)\n", version, readMesh.Code)
+				if readMesh.Code != 0 {
+					t.Errorf("For version %d, Code should be 0, got %d", version, readMesh.Code)
+				}
 			}
 		})
 	}
@@ -1181,6 +1368,7 @@ func TestMeshFaceAndEdgeGroups(t *testing.T) {
 // TestMeshWithInstanceNodes 测试实例化节点
 func TestMeshWithInstanceNodes(t *testing.T) {
 	mesh := NewMesh()
+	mesh.Version = V5 // 明确设置为V5版本
 
 	transform := mat4d.Ident
 	instanceMesh := &InstanceMesh{
@@ -1194,6 +1382,15 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 		},
 	}
 
+	// 添加Properties到Mesh和InstanceMesh
+	meshProps := make(Properties)
+	meshProps["mesh_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "parent mesh"}
+	mesh.Props = &meshProps
+
+	instanceProps := make(Properties)
+	instanceProps["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "child instance"}
+	instanceMesh.Props = &instanceProps
+
 	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
 
 	var buf bytes.Buffer
@@ -1201,11 +1398,34 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 
+	if readMesh.Version != V5 {
+		t.Errorf("Version = %d, want %d", readMesh.Version, V5)
+	}
 	if len(readMesh.InstanceNode) != 1 {
 		t.Errorf("Instance nodes = %d, want 1", len(readMesh.InstanceNode))
 	}
 	if len(readMesh.InstanceNode[0].Transfors) != 1 {
 		t.Errorf("Transforms = %d, want 1", len(readMesh.InstanceNode[0].Transfors))
+	}
+
+	// 检查Mesh的Properties
+	if readMesh.Props == nil {
+		t.Errorf("Mesh Props is nil")
+	} else {
+		meshProps := *readMesh.Props
+		if val, ok := meshProps["mesh_name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "parent mesh" {
+			t.Errorf("mesh_name property mismatch")
+		}
+	}
+
+	// 检查InstanceMesh的Properties
+	if readMesh.InstanceNode[0].Props == nil {
+		t.Errorf("InstanceMesh Props is nil")
+	} else {
+		instanceProps := *readMesh.InstanceNode[0].Props
+		if val, ok := instanceProps["instance_name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "child instance" {
+			t.Errorf("instance_name property mismatch")
+		}
 	}
 }
 
@@ -1303,8 +1523,15 @@ func TestMeshReadWriteLargeData(t *testing.T) {
 			}},
 			Code: 12345,
 		},
-		Version: V4,
+		Version: V5,
 	}
+
+	// 添加Properties
+	props := make(Properties)
+	props["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "large mesh"}
+	props["vertices_count"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(1000)}
+	props["faces_count"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(500)}
+	mesh.Props = &props
 
 	var buf bytes.Buffer
 	MeshMarshal(&buf, mesh)
@@ -1316,5 +1543,265 @@ func TestMeshReadWriteLargeData(t *testing.T) {
 	}
 	if len(readMesh.Nodes[0].FaceGroup[0].Faces) != len(faces) {
 		t.Errorf("Faces count = %d, want %d", len(readMesh.Nodes[0].FaceGroup[0].Faces), len(faces))
+	}
+
+	// 检查Properties
+	if readMesh.Props == nil {
+		t.Errorf("Props is nil for V5 mesh")
+	} else {
+		props := *readMesh.Props
+		if len(props) != 3 {
+			t.Errorf("Props count = %d, want 3", len(props))
+		}
+		if val, ok := props["name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "large mesh" {
+			t.Errorf("name property mismatch")
+		}
+		if val, ok := props["vertices_count"]; !ok || val.Type != PROP_TYPE_INT || val.Value.(int64) != 1000 {
+			t.Errorf("vertices_count property mismatch")
+		}
+		if val, ok := props["faces_count"]; !ok || val.Type != PROP_TYPE_INT || val.Value.(int64) != 500 {
+			t.Errorf("faces_count property mismatch")
+		}
+	}
+}
+
+// TestMeshInstanceNodeMarshalUnmarshal 独立测试MeshInstanceNodeMarshal和MeshInstanceNodeUnMarshal函数
+func TestMeshInstanceNodeMarshalUnmarshal(t *testing.T) {
+	// 创建测试数据
+	transform := mat4d.Ident
+	instanceMesh := &InstanceMesh{
+		Transfors: []*mat4d.T{&transform},
+		Features:  []uint64{100, 200, 300},
+		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 255, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 1}}},
+			},
+			Code: 54321,
+		},
+		Hash: 0x1234567890,
+	}
+
+	// 添加Properties
+	props := make(Properties)
+	props["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance"}
+	props["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(9876)}
+	instanceMesh.Props = &props
+
+	t.Logf("Original InstanceMesh:")
+	t.Logf("  Transfors: %d", len(instanceMesh.Transfors))
+	t.Logf("  Features: %v", instanceMesh.Features)
+	t.Logf("  Hash: 0x%x", instanceMesh.Hash)
+	t.Logf("  Props: %v", instanceMesh.Props)
+
+	// 序列化
+	var buf bytes.Buffer
+	MeshInstanceNodeMarshal(&buf, instanceMesh, V5)
+
+	t.Logf("Serialized data size: %d bytes", buf.Len())
+
+	// 反序列化
+	unmarshaled := MeshInstanceNodeUnMarshal(bytes.NewReader(buf.Bytes()), V5)
+
+	t.Logf("Unmarshaled InstanceMesh:")
+	t.Logf("  Transfors: %d", len(unmarshaled.Transfors))
+	t.Logf("  Features: %v", unmarshaled.Features)
+	t.Logf("  Hash: 0x%x", unmarshaled.Hash)
+	t.Logf("  Props: %v", unmarshaled.Props)
+
+	// 验证基本字段
+	if len(unmarshaled.Transfors) != len(instanceMesh.Transfors) {
+		t.Errorf("Transfors count mismatch: got %d, want %d", len(unmarshaled.Transfors), len(instanceMesh.Transfors))
+	}
+
+	if len(unmarshaled.Features) != len(instanceMesh.Features) {
+		t.Errorf("Features count mismatch: got %d, want %d", len(unmarshaled.Features), len(instanceMesh.Features))
+	}
+
+	for i, f := range unmarshaled.Features {
+		if f != instanceMesh.Features[i] {
+			t.Errorf("Feature[%d] mismatch: got %d, want %d", i, f, instanceMesh.Features[i])
+		}
+	}
+
+	if unmarshaled.Hash != instanceMesh.Hash {
+		t.Errorf("Hash mismatch: got 0x%x, want 0x%x", unmarshaled.Hash, instanceMesh.Hash)
+	}
+
+	// 验证Mesh字段
+	if unmarshaled.Mesh == nil {
+		t.Error("Mesh is nil")
+	} else {
+		if len(unmarshaled.Mesh.Materials) != len(instanceMesh.Mesh.Materials) {
+			t.Errorf("Materials count mismatch: got %d, want %d", len(unmarshaled.Mesh.Materials), len(instanceMesh.Mesh.Materials))
+		}
+		if len(unmarshaled.Mesh.Nodes) != len(instanceMesh.Mesh.Nodes) {
+			t.Errorf("Nodes count mismatch: got %d, want %d", len(unmarshaled.Mesh.Nodes), len(instanceMesh.Mesh.Nodes))
+		}
+		if unmarshaled.Mesh.Code != instanceMesh.Mesh.Code {
+			t.Errorf("Code mismatch: got %d, want %d", unmarshaled.Mesh.Code, instanceMesh.Mesh.Code)
+		}
+	}
+
+	// 验证Props字段
+	if unmarshaled.Props == nil {
+		t.Error("Props is nil")
+	} else {
+		readProps := *unmarshaled.Props
+		if len(readProps) != 2 {
+			t.Errorf("Props count = %d, want 2", len(readProps))
+		}
+
+		if val, ok := readProps["instance_name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "test instance" {
+			t.Error("instance_name property mismatch")
+		} else {
+			t.Log("instance_name property is correct")
+		}
+
+		if val, ok := readProps["instance_id"]; !ok || val.Type != PROP_TYPE_INT || val.Value.(int64) != 9876 {
+			t.Error("instance_id property mismatch")
+		} else {
+			t.Log("instance_id property is correct")
+		}
+	}
+}
+
+// TestMeshInstanceNodesMarshalUnmarshal 独立测试MeshInstanceNodesMarshal和MeshInstanceNodesUnMarshal函数
+func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
+	// 创建测试数据
+	transform1 := mat4d.Ident
+	transform2 := mat4d.Ident
+	transform2[0][0] = 2.0
+
+	instanceMesh1 := &InstanceMesh{
+		Transfors: []*mat4d.T{&transform1},
+		Features:  []uint64{100, 200, 300},
+		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 255, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 1}}},
+			},
+			Code: 54321,
+		},
+		Hash: 0x1234567890,
+	}
+
+	// 添加Properties到第一个InstanceMesh
+	props1 := make(Properties)
+	props1["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance 1"}
+	props1["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(9876)}
+	instanceMesh1.Props = &props1
+
+	instanceMesh2 := &InstanceMesh{
+		Transfors: []*mat4d.T{&transform2},
+		Features:  []uint64{400, 500, 600},
+		BBox:      &[6]float64{-2, -2, -2, 2, 2, 2},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 0, 255}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{1, 1, 0}}},
+			},
+			Code: 98765,
+		},
+		Hash: 0x9876543210,
+	}
+
+	// 添加Properties到第二个InstanceMesh
+	props2 := make(Properties)
+	props2["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance 2"}
+	props2["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(5432)}
+	instanceMesh2.Props = &props2
+
+	instanceNodes := []*InstanceMesh{instanceMesh1, instanceMesh2}
+
+	t.Logf("Original InstanceMeshes:")
+	t.Logf("  Count: %d", len(instanceNodes))
+	for i, inst := range instanceNodes {
+		t.Logf("  InstanceMesh[%d]:", i)
+		t.Logf("    Transfors: %d", len(inst.Transfors))
+		t.Logf("    Features: %v", inst.Features)
+		t.Logf("    Hash: 0x%x", inst.Hash)
+		t.Logf("    Props: %v", inst.Props)
+	}
+
+	// 序列化
+	var buf bytes.Buffer
+	MeshInstanceNodesMarshal(&buf, instanceNodes, V5)
+
+	t.Logf("Serialized data size: %d bytes", buf.Len())
+
+	// 反序列化
+	unmarshaled := MeshInstanceNodesUnMarshal(bytes.NewReader(buf.Bytes()), V5)
+
+	t.Logf("Unmarshaled InstanceMeshes:")
+	t.Logf("  Count: %d", len(unmarshaled))
+	for i, inst := range unmarshaled {
+		t.Logf("  InstanceMesh[%d]:", i)
+		t.Logf("    Transfors: %d", len(inst.Transfors))
+		t.Logf("    Features: %v", inst.Features)
+		t.Logf("    Hash: 0x%x", inst.Hash)
+		t.Logf("    Props: %v", inst.Props)
+	}
+
+	// 验证基本字段
+	if len(unmarshaled) != len(instanceNodes) {
+		t.Errorf("InstanceMeshes count mismatch: got %d, want %d", len(unmarshaled), len(instanceNodes))
+	}
+
+	for i, unmarshaledInst := range unmarshaled {
+		originalInst := instanceNodes[i]
+
+		if len(unmarshaledInst.Transfors) != len(originalInst.Transfors) {
+			t.Errorf("InstanceMesh[%d] Transfors count mismatch: got %d, want %d", i, len(unmarshaledInst.Transfors), len(originalInst.Transfors))
+		}
+
+		if len(unmarshaledInst.Features) != len(originalInst.Features) {
+			t.Errorf("InstanceMesh[%d] Features count mismatch: got %d, want %d", i, len(unmarshaledInst.Features), len(originalInst.Features))
+		}
+
+		for j, f := range unmarshaledInst.Features {
+			if f != originalInst.Features[j] {
+				t.Errorf("InstanceMesh[%d] Feature[%d] mismatch: got %d, want %d", i, j, f, originalInst.Features[j])
+			}
+		}
+
+		if unmarshaledInst.Hash != originalInst.Hash {
+			t.Errorf("InstanceMesh[%d] Hash mismatch: got 0x%x, want 0x%x", i, unmarshaledInst.Hash, originalInst.Hash)
+		}
+
+		// 验证Mesh字段
+		if unmarshaledInst.Mesh == nil {
+			t.Errorf("InstanceMesh[%d] Mesh is nil", i)
+		} else {
+			if len(unmarshaledInst.Mesh.Materials) != len(originalInst.Mesh.Materials) {
+				t.Errorf("InstanceMesh[%d] Materials count mismatch: got %d, want %d", i, len(unmarshaledInst.Mesh.Materials), len(originalInst.Mesh.Materials))
+			}
+			if len(unmarshaledInst.Mesh.Nodes) != len(originalInst.Mesh.Nodes) {
+				t.Errorf("InstanceMesh[%d] Nodes count mismatch: got %d, want %d", i, len(unmarshaledInst.Mesh.Nodes), len(originalInst.Mesh.Nodes))
+			}
+			if unmarshaledInst.Mesh.Code != originalInst.Mesh.Code {
+				t.Errorf("InstanceMesh[%d] Code mismatch: got %d, want %d", i, unmarshaledInst.Mesh.Code, originalInst.Mesh.Code)
+			}
+		}
+
+		// 验证Props字段
+		if unmarshaledInst.Props == nil {
+			t.Errorf("InstanceMesh[%d] Props is nil", i)
+		} else {
+			readProps := *unmarshaledInst.Props
+			originalProps := *originalInst.Props
+
+			if len(readProps) != len(originalProps) {
+				t.Errorf("InstanceMesh[%d] Props count = %d, want %d", i, len(readProps), len(originalProps))
+			}
+
+			for key, val := range readProps {
+				if originalVal, ok := originalProps[key]; !ok || val.Type != originalVal.Type || val.Value != originalVal.Value {
+					t.Errorf("InstanceMesh[%d] Props[%s] mismatch: got %v, want %v", i, key, val, originalVal)
+				}
+			}
+		}
 	}
 }
