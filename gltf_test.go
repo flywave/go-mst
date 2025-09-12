@@ -528,12 +528,14 @@ func TestMeshPropertiesToGltfExtensions(t *testing.T) {
 				{Vertices: []vec3.T{{0, 0, 0}}},
 			},
 		},
-		Props: &Properties{},
+		Props: []*Properties{},
 	}
 
 	// 为实例网格添加属性
-	(*instanceMesh.Props)["instance_string"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance_test"}
-	(*instanceMesh.Props)["instance_int"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(999)}
+	instanceProps := make(Properties)
+	instanceProps["instance_string"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance_test"}
+	instanceProps["instance_int"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(999)}
+	instanceMesh.Props = []*Properties{&instanceProps}
 
 	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
 
@@ -601,13 +603,13 @@ func TestMeshPropertiesToGltfExtensions(t *testing.T) {
 	}
 
 	// 验证实例网格属性是否正确添加到扩展中
-	instanceProps, exists := doc.Extensions["MST_instance_mesh_properties_0"]
+	instancePropsExt, exists := doc.Extensions["MST_instance_mesh_properties_0_0"]
 	if !exists {
-		t.Error("MST_instance_mesh_properties_0 extension not found")
+		t.Error("MST_instance_mesh_properties_0_0 extension not found")
 	} else {
-		propsMap, ok := instanceProps.(map[string]interface{})
+		propsMap, ok := instancePropsExt.(map[string]interface{})
 		if !ok {
-			t.Error("MST_instance_mesh_properties_0 is not a map")
+			t.Error("MST_instance_mesh_properties_0_0 is not a map")
 		} else {
 			if val, ok := propsMap["instance_string"]; !ok || val != "instance_test" {
 				t.Errorf("instance_string not found or incorrect: %v", val)

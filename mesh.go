@@ -93,7 +93,7 @@ type InstanceMesh struct {
 	Features  []uint64
 	BBox      *[6]float64
 	Mesh      *BaseMesh
-	Props     *Properties `json:"props,omitempty"`
+	Props     []*Properties `json:"props,omitempty"`
 	Hash      uint64
 }
 

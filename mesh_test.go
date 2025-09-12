@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	proj "github.com/flywave/go-proj"
+	dmat "github.com/flywave/go3d/float64/mat4"
 	mat4d "github.com/flywave/go3d/float64/mat4"
 	vec3d "github.com/flywave/go3d/float64/vec3"
 
@@ -464,7 +465,7 @@ func TestInstanceMeshV5Properties(t *testing.T) {
 	props := make(Properties)
 	props["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance"}
 	props["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(9876)}
-	instanceMesh.Props = &props
+	instanceMesh.Props = []*Properties{&props}
 
 	// 将InstanceMesh添加到父Mesh
 	parentMesh.InstanceNode = []*InstanceMesh{instanceMesh}
@@ -484,11 +485,11 @@ func TestInstanceMeshV5Properties(t *testing.T) {
 	}
 
 	unmarshaled := readMesh.InstanceNode[0]
-	if unmarshaled.Props == nil {
-		t.Fatal("Props is nil for V5 instance mesh")
+	if unmarshaled.Props == nil || len(unmarshaled.Props) == 0 {
+		t.Fatal("Props is nil or empty for V5 instance mesh")
 	}
 
-	readProps := *unmarshaled.Props
+	readProps := *unmarshaled.Props[0]
 	if len(readProps) != 2 {
 		t.Errorf("Props count = %d, want 2", len(readProps))
 	}
@@ -1421,7 +1422,7 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 
 	instanceProps := make(Properties)
 	instanceProps["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "child instance"}
-	instanceMesh.Props = &instanceProps
+	instanceMesh.Props = []*Properties{&instanceProps}
 
 	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
 
@@ -1453,10 +1454,10 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 	}
 
 	// 检查InstanceMesh的Properties
-	if readMesh.InstanceNode[0].Props == nil {
-		t.Errorf("InstanceMesh Props is nil")
+	if readMesh.InstanceNode[0].Props == nil || len(readMesh.InstanceNode[0].Props) == 0 {
+		t.Errorf("InstanceMesh Props is nil or empty")
 	} else {
-		instanceProps := *readMesh.InstanceNode[0].Props
+		instanceProps := *readMesh.InstanceNode[0].Props[0]
 		if val, ok := instanceProps["instance_name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "child instance" {
 			t.Errorf("instance_name property mismatch")
 		}
@@ -1623,7 +1624,7 @@ func TestMeshInstanceNodeMarshalUnmarshal(t *testing.T) {
 	props := make(Properties)
 	props["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance"}
 	props["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(9876)}
-	instanceMesh.Props = &props
+	instanceMesh.Props = []*Properties{&props}
 
 	t.Logf("Original InstanceMesh:")
 	t.Logf("  Transfors: %d", len(instanceMesh.Transfors))
@@ -1681,10 +1682,10 @@ func TestMeshInstanceNodeMarshalUnmarshal(t *testing.T) {
 	}
 
 	// 验证Props字段
-	if unmarshaled.Props == nil {
-		t.Error("Props is nil")
+	if unmarshaled.Props == nil || len(unmarshaled.Props) == 0 {
+		t.Error("Props is nil or empty")
 	} else {
-		readProps := *unmarshaled.Props
+		readProps := *unmarshaled.Props[0]
 		if len(readProps) != 2 {
 			t.Errorf("Props count = %d, want 2", len(readProps))
 		}
@@ -1728,7 +1729,7 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 	props1 := make(Properties)
 	props1["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance 1"}
 	props1["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(9876)}
-	instanceMesh1.Props = &props1
+	instanceMesh1.Props = []*Properties{&props1}
 
 	instanceMesh2 := &InstanceMesh{
 		Transfors: []*mat4d.T{&transform2},
@@ -1748,7 +1749,7 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 	props2 := make(Properties)
 	props2["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test instance 2"}
 	props2["instance_id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(5432)}
-	instanceMesh2.Props = &props2
+	instanceMesh2.Props = []*Properties{&props2}
 
 	instanceNodes := []*InstanceMesh{instanceMesh1, instanceMesh2}
 
@@ -1759,7 +1760,11 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 		t.Logf("    Transfors: %d", len(inst.Transfors))
 		t.Logf("    Features: %v", inst.Features)
 		t.Logf("    Hash: 0x%x", inst.Hash)
-		t.Logf("    Props: %v", inst.Props)
+		if inst.Props != nil && len(inst.Props) > 0 {
+			t.Logf("    Props: %v", inst.Props[0])
+		} else {
+			t.Logf("    Props: nil")
+		}
 	}
 
 	// 序列化
@@ -1778,7 +1783,11 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 		t.Logf("    Transfors: %d", len(inst.Transfors))
 		t.Logf("    Features: %v", inst.Features)
 		t.Logf("    Hash: 0x%x", inst.Hash)
-		t.Logf("    Props: %v", inst.Props)
+		if inst.Props != nil && len(inst.Props) > 0 {
+			t.Logf("    Props: %v", inst.Props[0])
+		} else {
+			t.Logf("    Props: nil")
+		}
 	}
 
 	// 验证基本字段
@@ -1823,11 +1832,11 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 		}
 
 		// 验证Props字段
-		if unmarshaledInst.Props == nil {
-			t.Errorf("InstanceMesh[%d] Props is nil", i)
+		if unmarshaledInst.Props == nil || len(unmarshaledInst.Props) == 0 {
+			t.Errorf("InstanceMesh[%d] Props is nil or empty", i)
 		} else {
-			readProps := *unmarshaledInst.Props
-			originalProps := *originalInst.Props
+			readProps := *unmarshaledInst.Props[0]
+			originalProps := *originalInst.Props[0]
 
 			if len(readProps) != len(originalProps) {
 				t.Errorf("InstanceMesh[%d] Props count = %d, want %d", i, len(readProps), len(originalProps))
@@ -1839,5 +1848,209 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestInstanceMeshPropsArray(t *testing.T) {
+	// 创建测试数据
+	transform1 := dmat.Ident
+	transform2 := dmat.Ident
+	transform2[0][0] = 2.0
+
+	// 创建两个不同的Properties
+	props1 := make(Properties)
+	props1["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance1"}
+	props1["id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(1)}
+
+	props2 := make(Properties)
+	props2["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance2"}
+	props2["id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(2)}
+
+	instanceMesh := &InstanceMesh{
+		Transfors: []*dmat.T{&transform1, &transform2},
+		Features:  []uint64{100, 200},
+		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 255, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 1}}},
+			},
+			Code: 54321,
+		},
+		Props: []*Properties{&props1, &props2},
+		Hash:  0x1234567890,
+	}
+
+	// 验证原始数据
+	if len(instanceMesh.Transfors) != 2 {
+		t.Errorf("Expected 2 transforms, got %d", len(instanceMesh.Transfors))
+	}
+	if len(instanceMesh.Features) != 2 {
+		t.Errorf("Expected 2 features, got %d", len(instanceMesh.Features))
+	}
+	if len(instanceMesh.Props) != 2 {
+		t.Errorf("Expected 2 props, got %d", len(instanceMesh.Props))
+	}
+
+	// 序列化
+	var buf bytes.Buffer
+	err := MeshInstanceNodeMarshal(&buf, instanceMesh, V5)
+	if err != nil {
+		t.Fatalf("MeshInstanceNodeMarshal failed: %v", err)
+	}
+
+	// 反序列化
+	unmarshaled := MeshInstanceNodeUnMarshal(bytes.NewReader(buf.Bytes()), V5)
+	if unmarshaled == nil {
+		t.Fatal("MeshInstanceNodeUnMarshal returned nil")
+	}
+
+	// 验证反序列化后的数据
+	if len(unmarshaled.Transfors) != 2 {
+		t.Errorf("Expected 2 transforms after unmarshal, got %d", len(unmarshaled.Transfors))
+	}
+	if len(unmarshaled.Features) != 2 {
+		t.Errorf("Expected 2 features after unmarshal, got %d", len(unmarshaled.Features))
+	}
+	if len(unmarshaled.Props) != 2 {
+		t.Errorf("Expected 2 props after unmarshal, got %d", len(unmarshaled.Props))
+	}
+
+	// 验证Props内容
+	if unmarshaled.Props[0] == nil {
+		t.Error("Props[0] should not be nil")
+	} else {
+		if (*unmarshaled.Props[0])["name"].Value.(string) != "instance1" {
+			t.Error("Props[0] name mismatch")
+		}
+		if (*unmarshaled.Props[0])["id"].Value.(int64) != 1 {
+			t.Error("Props[0] id mismatch")
+		}
+	}
+
+	if unmarshaled.Props[1] == nil {
+		t.Error("Props[1] should not be nil")
+	} else {
+		if (*unmarshaled.Props[1])["name"].Value.(string) != "instance2" {
+			t.Error("Props[1] name mismatch")
+		}
+		if (*unmarshaled.Props[1])["id"].Value.(int64) != 2 {
+			t.Error("Props[1] id mismatch")
+		}
+	}
+}
+
+func TestInstanceMeshPropsArrayMismatch(t *testing.T) {
+	// 创建测试数据，Props数量与Transfors/Features不匹配
+	transform1 := dmat.Ident
+	transform2 := dmat.Ident
+	transform2[0][0] = 2.0
+
+	// 只创建一个Properties，但有两个Transfors/Features
+	props1 := make(Properties)
+	props1["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance1"}
+
+	instanceMesh := &InstanceMesh{
+		Transfors: []*dmat.T{&transform1, &transform2},
+		Features:  []uint64{100, 200},
+		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 255, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 1}}},
+			},
+			Code: 54321,
+		},
+		Props: []*Properties{&props1}, // 只有一个Props
+		Hash:  0x1234567890,
+	}
+
+	// 序列化
+	var buf bytes.Buffer
+	err := MeshInstanceNodeMarshal(&buf, instanceMesh, V5)
+	if err != nil {
+		t.Fatalf("MeshInstanceNodeMarshal failed: %v", err)
+	}
+
+	// 反序列化
+	unmarshaled := MeshInstanceNodeUnMarshal(bytes.NewReader(buf.Bytes()), V5)
+	if unmarshaled == nil {
+		t.Fatal("MeshInstanceNodeUnMarshal returned nil")
+	}
+
+	// 验证反序列化后的数据
+	if len(unmarshaled.Transfors) != 2 {
+		t.Errorf("Expected 2 transforms after unmarshal, got %d", len(unmarshaled.Transfors))
+	}
+	if len(unmarshaled.Features) != 2 {
+		t.Errorf("Expected 2 features after unmarshal, got %d", len(unmarshaled.Features))
+	}
+	// 应该自动扩展到与Transfors/Features相同的长度
+	if len(unmarshaled.Props) != 2 {
+		t.Errorf("Expected 2 props after unmarshal, got %d", len(unmarshaled.Props))
+	}
+
+	// 验证Props内容
+	if unmarshaled.Props[0] == nil {
+		t.Error("Props[0] should not be nil")
+	} else {
+		if (*unmarshaled.Props[0])["name"].Value.(string) != "instance1" {
+			t.Error("Props[0] name mismatch")
+		}
+	}
+
+	// 第二个Props应该是nil
+	if unmarshaled.Props[1] != nil {
+		t.Error("Props[1] should be nil")
+	}
+}
+
+func TestInstanceMeshEmptyProps(t *testing.T) {
+	// 创建测试数据，没有Props
+	transform1 := dmat.Ident
+
+	instanceMesh := &InstanceMesh{
+		Transfors: []*dmat.T{&transform1},
+		Features:  []uint64{100},
+		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
+		Mesh: &BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 255, 0}}},
+			Nodes: []*MeshNode{
+				{Vertices: []vec3.T{{0, 0, 1}}},
+			},
+			Code: 54321,
+		},
+		Props: nil, // 没有Props
+		Hash:  0x1234567890,
+	}
+
+	// 序列化
+	var buf bytes.Buffer
+	err := MeshInstanceNodeMarshal(&buf, instanceMesh, V5)
+	if err != nil {
+		t.Fatalf("MeshInstanceNodeMarshal failed: %v", err)
+	}
+
+	// 反序列化
+	unmarshaled := MeshInstanceNodeUnMarshal(bytes.NewReader(buf.Bytes()), V5)
+	if unmarshaled == nil {
+		t.Fatal("MeshInstanceNodeUnMarshal returned nil")
+	}
+
+	// 验证反序列化后的数据
+	if len(unmarshaled.Transfors) != 1 {
+		t.Errorf("Expected 1 transform after unmarshal, got %d", len(unmarshaled.Transfors))
+	}
+	if len(unmarshaled.Features) != 1 {
+		t.Errorf("Expected 1 feature after unmarshal, got %d", len(unmarshaled.Features))
+	}
+	// 应该自动创建与Transfors/Features相同长度的Props数组
+	if len(unmarshaled.Props) != 1 {
+		t.Errorf("Expected 1 prop after unmarshal, got %d", len(unmarshaled.Props))
+	}
+
+	// Props应该都是nil
+	if unmarshaled.Props[0] != nil {
+		t.Error("Props[0] should be nil")
 	}
 }

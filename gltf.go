@@ -150,16 +150,21 @@ func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
 
 	for i, instance := range mesh.InstanceNode {
 		// 处理实例网格的属性
-		if instance.Props != nil && len(*instance.Props) > 0 {
-			if doc.Extensions == nil {
-				doc.Extensions = make(map[string]interface{})
-			}
+		if instance.Props != nil && len(instance.Props) > 0 {
+			// 只使用第一个Props元素，或者合并所有Props元素
+			for j, props := range instance.Props {
+				if props != nil && len(*props) > 0 {
+					if doc.Extensions == nil {
+						doc.Extensions = make(map[string]interface{})
+					}
 
-			// 将实例属性添加到文档扩展中，使用实例索引作为键
-			propsMap := propsToMap(instance.Props)
-			if propsMap != nil {
-				instanceKey := "MST_instance_mesh_properties_" + fmt.Sprintf("%d", i)
-				doc.Extensions[instanceKey] = propsMap
+					// 将实例属性添加到文档扩展中，使用实例索引和属性索引作为键
+					propsMap := propsToMap(props)
+					if propsMap != nil {
+						instanceKey := "MST_instance_mesh_properties_" + fmt.Sprintf("%d_%d", i, j)
+						doc.Extensions[instanceKey] = propsMap
+					}
+				}
 			}
 		}
 

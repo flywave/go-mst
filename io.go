@@ -788,17 +788,37 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) error
 	}
 	// V5 版本序列化新增属性
 	if v >= V5 {
-		var hasProps uint32 = 0
-		if instNd.Props != nil && len(*instNd.Props) > 0 {
-			hasProps = 1
+		// 确保Props数组的数量与Features和Transfors对应
+		expectedLen := len(instNd.Transfors)
+		if len(instNd.Features) > expectedLen {
+			expectedLen = len(instNd.Features)
 		}
-		// 统一写入hasProps标记
-		if err := writeLittleUint32(wt, hasProps); err != nil {
+
+		// 写入Props数组长度
+		if err := writeLittleUint32(wt, uint32(expectedLen)); err != nil {
 			return err
 		}
-		if hasProps == 1 {
-			if err := PropertiesMarshal(wt, instNd.Props); err != nil {
-				return err
+
+		// 写入每个Props元素
+		for i := 0; i < expectedLen; i++ {
+			var props *Properties
+			if instNd.Props != nil && i < len(instNd.Props) {
+				props = instNd.Props[i]
+			}
+
+			if props != nil && len(*props) > 0 {
+				// 写入标记位1表示有Properties
+				if err := writeLittleUint32(wt, uint32(1)); err != nil {
+					return err
+				}
+				if err := PropertiesMarshal(wt, props); err != nil {
+					return err
+				}
+			} else {
+				// 如果Props为nil或空，写入标记位0
+				if err := writeLittleUint32(wt, uint32(0)); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -856,17 +876,45 @@ func MeshInstanceNodeUnMarshal(rd io.Reader, v uint32) *InstanceMesh {
 	}
 	// V5 版本反序列化新增属性
 	if v >= V5 {
-		var hasProps uint32
-		if err := readLittleByte(rd, &hasProps); err != nil {
+		// 读取Props数组长度
+		var propsLen uint32
+		if err := readLittleByte(rd, &propsLen); err != nil {
 			return nil
 		}
-		if hasProps > 0 {
-			inst.Props = PropertiesUnMarshal(rd)
-			if inst.Props == nil {
+
+		// 确保Props数组的数量与Features和Transfors对应
+		expectedLen := len(inst.Transfors)
+		if len(inst.Features) > expectedLen {
+			expectedLen = len(inst.Features)
+		}
+		if int(propsLen) > expectedLen {
+			expectedLen = int(propsLen)
+		}
+
+		// 创建Props数组
+		inst.Props = make([]*Properties, expectedLen)
+
+		// 读取每个Props元素
+		for i := 0; i < int(propsLen); i++ {
+			var hasProps uint32
+			if err := readLittleByte(rd, &hasProps); err != nil {
 				return nil
 			}
-		} else {
-			inst.Props = nil
+
+			if hasProps > 0 {
+				props := PropertiesUnMarshal(rd)
+				if props == nil {
+					return nil
+				}
+				inst.Props[i] = props
+			} else {
+				inst.Props[i] = nil
+			}
+		}
+
+		// 对于超出propsLen但小于expectedLen的部分，设置为nil
+		for i := int(propsLen); i < expectedLen; i++ {
+			inst.Props[i] = nil
 		}
 	} else {
 		// For versions less than V5, ensure Props is nil
