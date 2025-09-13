@@ -150,7 +150,7 @@ func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
 
 	for i, instance := range mesh.InstanceNode {
 		// 处理实例网格的属性
-		if instance.Props != nil && len(instance.Props) > 0 {
+		if len(instance.Props) > 0 {
 			// 只使用第一个Props元素，或者合并所有Props元素
 			for j, props := range instance.Props {
 				if props != nil && len(*props) > 0 {
