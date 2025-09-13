@@ -310,8 +310,8 @@ func TestMeshMarshalUnmarshal(t *testing.T) {
 					},
 					Code: 54321,
 				},
-				Version:      version,
-				InstanceNode: []*InstanceMesh{},
+				Version:   version,
+				Instances: []*InstanceMesh{},
 			}
 
 			var buf bytes.Buffer
@@ -410,7 +410,7 @@ func TestInstanceMeshV5Properties(t *testing.T) {
 	instanceMesh.Props = []*Properties{&props}
 
 	// 将InstanceMesh添加到父Mesh
-	parentMesh.InstanceNode = []*InstanceMesh{instanceMesh}
+	parentMesh.Instances = []*InstanceMesh{instanceMesh}
 
 	// 序列化整个Mesh
 	var buf bytes.Buffer
@@ -422,11 +422,11 @@ func TestInstanceMeshV5Properties(t *testing.T) {
 	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
 
 	// 验证结果
-	if len(readMesh.InstanceNode) == 0 {
+	if len(readMesh.Instances) == 0 {
 		t.Fatal("No instance nodes found")
 	}
 
-	unmarshaled := readMesh.InstanceNode[0]
+	unmarshaled := readMesh.Instances[0]
 	if unmarshaled.Props == nil || len(unmarshaled.Props) == 0 {
 		t.Fatal("Props is nil or empty for V5 instance mesh")
 	}
@@ -668,7 +668,7 @@ func TestMeshComplexStructure(t *testing.T) {
 
 	// 实例化节点
 	transform := mat4d.Ident
-	mesh.InstanceNode = []*InstanceMesh{
+	mesh.Instances = []*InstanceMesh{
 		{
 			Transfors: []*mat4d.T{&transform},
 			Features:  []uint64{100, 200, 300},
@@ -692,7 +692,7 @@ func TestMeshComplexStructure(t *testing.T) {
 	if len(readMesh.Nodes) != 2 {
 		t.Errorf("nodes count mismatch")
 	}
-	if len(readMesh.InstanceNode) != 1 {
+	if len(readMesh.Instances) != 1 {
 		t.Errorf("instance nodes count mismatch")
 	}
 }
@@ -1128,7 +1128,7 @@ func TestMeshWithEmptyComponents(t *testing.T) {
 	}{
 		{"EmptyMaterials", &Mesh{BaseMesh: BaseMesh{Materials: []MeshMaterial{}, Nodes: []*MeshNode{}}}},
 		{"EmptyNodes", &Mesh{BaseMesh: BaseMesh{Materials: []MeshMaterial{&BaseMaterial{}}, Nodes: []*MeshNode{}}}},
-		{"EmptyInstanceNodes", &Mesh{BaseMesh: BaseMesh{}, InstanceNode: []*InstanceMesh{}}},
+		{"EmptyInstanceNodes", &Mesh{BaseMesh: BaseMesh{}, Instances: []*InstanceMesh{}}},
 	}
 
 	for _, tt := range tests {
@@ -1350,7 +1350,7 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 	instanceProps["instance_name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "child instance"}
 	instanceMesh.Props = []*Properties{&instanceProps}
 
-	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
+	mesh.Instances = []*InstanceMesh{instanceMesh}
 
 	var buf bytes.Buffer
 	if err := MeshMarshal(&buf, mesh); err != nil {
@@ -1362,11 +1362,11 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 	if readMesh.Version != V5 {
 		t.Errorf("Version = %d, want %d", readMesh.Version, V5)
 	}
-	if len(readMesh.InstanceNode) != 1 {
-		t.Errorf("Instance nodes = %d, want 1", len(readMesh.InstanceNode))
+	if len(readMesh.Instances) != 1 {
+		t.Errorf("Instance nodes = %d, want 1", len(readMesh.Instances))
 	}
-	if len(readMesh.InstanceNode[0].Transfors) != 1 {
-		t.Errorf("Transforms = %d, want 1", len(readMesh.InstanceNode[0].Transfors))
+	if len(readMesh.Instances[0].Transfors) != 1 {
+		t.Errorf("Transforms = %d, want 1", len(readMesh.Instances[0].Transfors))
 	}
 
 	// 检查Mesh的Properties
@@ -1380,10 +1380,10 @@ func TestMeshWithInstanceNodes(t *testing.T) {
 	}
 
 	// 检查InstanceMesh的Properties
-	if readMesh.InstanceNode[0].Props == nil || len(readMesh.InstanceNode[0].Props) == 0 {
+	if readMesh.Instances[0].Props == nil || len(readMesh.Instances[0].Props) == 0 {
 		t.Errorf("InstanceMesh Props is nil or empty")
 	} else {
-		instanceProps := *readMesh.InstanceNode[0].Props[0]
+		instanceProps := *readMesh.Instances[0].Props[0]
 		if val, ok := instanceProps["instance_name"]; !ok || val.Type != PROP_TYPE_STRING || val.Value.(string) != "child instance" {
 			t.Errorf("instance_name property mismatch")
 		}

@@ -123,9 +123,9 @@ type BaseMesh struct {
 
 type Mesh struct {
 	BaseMesh
-	Version      uint32 `json:"version"`
-	InstanceNode []*InstanceMesh
-	Props        *Properties `json:"props,omitempty"`
+	Version   uint32 `json:"version"`
+	Instances []*InstanceMesh
+	Props     *Properties `json:"props,omitempty"`
 }
 
 func NewMesh() *Mesh {

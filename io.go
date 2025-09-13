@@ -575,7 +575,7 @@ func MeshMarshal(wt io.Writer, ms *Mesh) error {
 	if err := MeshNodesMarshalWithVersion(wt, ms.Nodes, ms.Version); err != nil {
 		return err
 	}
-	if err := MeshInstanceNodesMarshal(wt, ms.InstanceNode, ms.Version); err != nil {
+	if err := MeshInstanceNodesMarshal(wt, ms.Instances, ms.Version); err != nil {
 		return err
 	}
 	// V5 版本序列化新增属性
@@ -614,7 +614,7 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 	} else {
 		ms.Nodes = MeshNodesUnMarshal(rd)
 	}
-	ms.InstanceNode = MeshInstanceNodesUnMarshal(rd, ms.Version)
+	ms.Instances = MeshInstanceNodesUnMarshal(rd, ms.Version)
 	// V5 版本反序列化新增属性
 	if ms.Version >= V5 {
 		var hasProps uint32

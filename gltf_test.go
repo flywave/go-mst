@@ -75,7 +75,7 @@ func TestMstToGltf(t *testing.T) {
 				},
 			},
 		},
-		InstanceNode: nil,
+		Instances: nil,
 	}
 
 	doc, err := MstToGltf([]*Mesh{mesh})
@@ -127,7 +127,7 @@ func TestMstToGltfWithOutline(t *testing.T) {
 				},
 			},
 		},
-		InstanceNode: nil,
+		Instances: nil,
 	}
 
 	doc, err := MstToGltfWithOutline([]*Mesh{mesh})
@@ -490,7 +490,7 @@ func TestMeshPropertiesToGltfExtensions(t *testing.T) {
 	instanceProps["instance_int"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(999)}
 	instanceMesh.Props = []*Properties{&instanceProps}
 
-	mesh.InstanceNode = []*InstanceMesh{instanceMesh}
+	mesh.Instances = []*InstanceMesh{instanceMesh}
 
 	// 构建GLTF文档
 	doc := CreateDoc()
