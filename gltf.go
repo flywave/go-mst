@@ -464,19 +464,6 @@ func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat
 				gltfNode.Scale = [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])}
 			}
 
-			// 处理节点的属性
-			if node.Props != nil && len(*node.Props) > 0 {
-				if gltfNode.Extensions == nil {
-					gltfNode.Extensions = make(map[string]interface{})
-				}
-
-				// 将节点属性添加到节点扩展中
-				propsMap := propsToMap(node.Props)
-				if propsMap != nil {
-					gltfNode.Extensions["MST_node_properties"] = propsMap
-				}
-			}
-
 			doc.Nodes = append(doc.Nodes, gltfNode)
 			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, nodeIndex)
 		} else {
@@ -488,19 +475,6 @@ func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat
 					Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
 					Rotation:    [4]float32{float32(rotation[0]), float32(rotation[1]), float32(rotation[2]), float32(rotation[3])},
 					Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
-				}
-
-				// 处理节点的属性
-				if node.Props != nil && len(*node.Props) > 0 {
-					if gltfNode.Extensions == nil {
-						gltfNode.Extensions = make(map[string]interface{})
-					}
-
-					// 将节点属性添加到节点扩展中
-					propsMap := propsToMap(node.Props)
-					if propsMap != nil {
-						gltfNode.Extensions["MST_node_properties"] = propsMap
-					}
 				}
 
 				doc.Nodes = append(doc.Nodes, gltfNode)

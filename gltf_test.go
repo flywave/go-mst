@@ -188,10 +188,6 @@ func TestBuildGltfFromBaseMesh(t *testing.T) {
 						},
 					},
 				},
-				Props: &Properties{
-					"name": {Type: PROP_TYPE_STRING, Value: "test_node"},
-					"id":   {Type: PROP_TYPE_INT, Value: int64(123)},
-				},
 			},
 		},
 		Materials: []MeshMaterial{
@@ -218,25 +214,6 @@ func TestBuildGltfFromBaseMesh(t *testing.T) {
 	// 检查节点属性是否正确添加到GLTF节点扩展中
 	if len(doc.Nodes) != 1 {
 		t.Errorf("Expected 1 node, got %d", len(doc.Nodes))
-	} else {
-		if doc.Nodes[0].Extensions == nil {
-			t.Error("Node extensions should not be nil")
-		} else {
-			if props, exists := doc.Nodes[0].Extensions["MST_node_properties"]; !exists {
-				t.Error("MST_node_properties extension should exist")
-			} else {
-				if propsMap, ok := props.(map[string]interface{}); !ok {
-					t.Error("Props should be a map")
-				} else {
-					if name, exists := propsMap["name"]; !exists || name != "test_node" {
-						t.Error("Node name property not found or incorrect")
-					}
-					if id, exists := propsMap["id"]; !exists || id != int64(123) {
-						t.Error("Node id property not found or incorrect")
-					}
-				}
-			}
-		}
 	}
 }
 
@@ -259,10 +236,6 @@ func TestBuildGltfWithTransforms(t *testing.T) {
 							{Vertex: [3]uint32{0, 1, 2}},
 						},
 					},
-				},
-				Props: &Properties{
-					"name": {Type: PROP_TYPE_STRING, Value: "transformed_node"},
-					"type": {Type: PROP_TYPE_STRING, Value: "instance"},
 				},
 			},
 		},
@@ -296,26 +269,6 @@ func TestBuildGltfWithTransforms(t *testing.T) {
 	node := doc.Nodes[0]
 	if node.Translation[0] != 10 {
 		t.Errorf("Expected translation x=10, got %f", node.Translation[0])
-	}
-
-	// 检查节点属性是否正确添加到GLTF节点扩展中
-	if node.Extensions == nil {
-		t.Error("Node extensions should not be nil")
-	} else {
-		if props, exists := node.Extensions["MST_node_properties"]; !exists {
-			t.Error("MST_node_properties extension should exist")
-		} else {
-			if propsMap, ok := props.(map[string]interface{}); !ok {
-				t.Error("Props should be a map")
-			} else {
-				if name, exists := propsMap["name"]; !exists || name != "transformed_node" {
-					t.Error("Node name property not found or incorrect")
-				}
-				if typ, exists := propsMap["type"]; !exists || typ != "instance" {
-					t.Error("Node type property not found or incorrect")
-				}
-			}
-		}
 	}
 }
 

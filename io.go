@@ -465,13 +465,7 @@ func MeshNodeMarshal(wt io.Writer, nd *MeshNode) error {
 			return err
 		}
 	}
-	// V5 版本序列化新增属性
-	if nd.Props != nil && len(*nd.Props) > 0 {
-		return PropertiesMarshal(wt, nd.Props)
-	} else {
-		// 如果Props为nil，写入size为0
-		return writeLittleByte(wt, uint32(0))
-	}
+	return nil
 }
 
 func MeshNodeUnMarshal(rd io.Reader) *MeshNode {
@@ -519,8 +513,6 @@ func MeshNodeUnMarshal(rd io.Reader) *MeshNode {
 	for i := 0; i < int(size); i++ {
 		nd.EdgeGroup[i] = MeshOutlineUnMarshal(rd)
 	}
-	// V5 版本反序列化新增属性
-	nd.Props = PropertiesUnMarshal(rd)
 	return &nd
 }
 
@@ -1013,7 +1005,6 @@ func MeshNodeUnMarshalWithoutProps(rd io.Reader) *MeshNode {
 		nd.EdgeGroup[i] = MeshOutlineUnMarshal(rd)
 	}
 
-	nd.Props = nil
 	return &nd
 }
 
@@ -1077,11 +1068,5 @@ func MeshNodeUnMarshalWithVersion(rd io.Reader, v uint32) *MeshNode {
 		nd.EdgeGroup[i] = MeshOutlineUnMarshal(rd)
 	}
 
-	// V5 版本反序列化新增属性
-	if v >= V5 {
-		nd.Props = PropertiesUnMarshal(rd)
-	} else {
-		nd.Props = nil
-	}
 	return &nd
 }

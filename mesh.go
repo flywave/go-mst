@@ -18,7 +18,6 @@ type MeshNode struct {
 	Mat       *dmat.T         `json:"mat,omitempty"`
 	FaceGroup []*MeshTriangle `json:"faceGroup,omitempty"`
 	EdgeGroup []*MeshOutline  `json:"edgeGroup,omitempty"`
-	Props     *Properties     `json:"props,omitempty"`
 }
 
 func (n *MeshNode) ResortVtVn(m *Mesh) {

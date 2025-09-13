@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	proj "github.com/flywave/go-proj"
-	dmat "github.com/flywave/go3d/float64/mat4"
 	mat4d "github.com/flywave/go3d/float64/mat4"
 	vec3d "github.com/flywave/go3d/float64/vec3"
 
@@ -275,9 +274,7 @@ func TestMeshNodeMarshalUnmarshal(t *testing.T) {
 		TexCoords: []vec2.T{{0, 0}, {1, 0}, {0, 1}},
 		FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}}},
 		EdgeGroup: []*MeshOutline{{Batchid: 0, Edges: [][2]uint32{{0, 1}, {1, 2}, {2, 0}}}},
-		Props:     &Properties{"test": {Type: PROP_TYPE_STRING, Value: "value"}},
 	}
-
 	var buf bytes.Buffer
 	if err := MeshNodeMarshal(&buf, node); err != nil {
 		t.Fatalf("MeshNodeMarshal failed: %v", err)
@@ -293,12 +290,6 @@ func TestMeshNodeMarshalUnmarshal(t *testing.T) {
 	}
 	if len(unmarshaled.EdgeGroup) != len(node.EdgeGroup) {
 		t.Errorf("edge groups count mismatch")
-	}
-	// 检查Props属性
-	if unmarshaled.Props == nil {
-		t.Errorf("props should not be nil")
-	} else if (*unmarshaled.Props)["test"].Value != "value" {
-		t.Errorf("props value mismatch")
 	}
 }
 
@@ -340,55 +331,6 @@ func TestMeshMarshalUnmarshal(t *testing.T) {
 				t.Errorf("code mismatch for V4")
 			}
 		})
-	}
-}
-
-// TestMeshNodeWithProps 测试带Props属性的节点
-func TestMeshNodeWithProps(t *testing.T) {
-	// 测试带Props的节点
-	nodeWithProps := &MeshNode{
-		Vertices:  []vec3.T{{0, 0, 0}},
-		FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
-		Props: &Properties{
-			"name": {Type: PROP_TYPE_STRING, Value: "test_node"},
-			"id":   {Type: PROP_TYPE_INT, Value: int64(123)},
-		},
-	}
-
-	var buf bytes.Buffer
-	if err := MeshNodeMarshal(&buf, nodeWithProps); err != nil {
-		t.Fatalf("MeshNodeMarshal failed: %v", err)
-	}
-
-	unmarshaledWithProps := MeshNodeUnMarshal(bytes.NewReader(buf.Bytes()))
-
-	if unmarshaledWithProps.Props == nil {
-		t.Error("Props should not be nil")
-	} else {
-		if (*unmarshaledWithProps.Props)["name"].Value != "test_node" {
-			t.Error("String property value mismatch")
-		}
-		if (*unmarshaledWithProps.Props)["id"].Value != int64(123) {
-			t.Error("Int property value mismatch")
-		}
-	}
-
-	// 测试不带Props的节点
-	nodeWithoutProps := &MeshNode{
-		Vertices:  []vec3.T{{0, 0, 0}},
-		FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
-		Props:     nil,
-	}
-
-	var buf2 bytes.Buffer
-	if err := MeshNodeMarshal(&buf2, nodeWithoutProps); err != nil {
-		t.Fatalf("MeshNodeMarshal failed: %v", err)
-	}
-
-	unmarshaledWithoutProps := MeshNodeUnMarshal(bytes.NewReader(buf2.Bytes()))
-
-	if unmarshaledWithoutProps.Props != nil && len(*unmarshaledWithoutProps.Props) > 0 {
-		t.Error("Props should be nil or empty for node without props")
 	}
 }
 
@@ -513,7 +455,6 @@ func TestMeshNodesMarshalUnmarshal(t *testing.T) {
 			TexCoords: []vec2.T{{0, 0}, {1, 0}, {0, 1}},
 			FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}}},
 			EdgeGroup: []*MeshOutline{{Batchid: 0, Edges: [][2]uint32{{0, 1}, {1, 2}, {2, 0}}}},
-			Props:     &Properties{"test": {Type: PROP_TYPE_STRING, Value: "value1"}},
 		},
 		{
 			Vertices:  []vec3.T{{1, 0, 0}, {2, 0, 0}, {1, 1, 0}},
@@ -522,7 +463,6 @@ func TestMeshNodesMarshalUnmarshal(t *testing.T) {
 			TexCoords: []vec2.T{{0, 1}, {1, 1}, {0, 0}},
 			FaceGroup: []*MeshTriangle{{Batchid: 1, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}}}}},
 			EdgeGroup: []*MeshOutline{{Batchid: 1, Edges: [][2]uint32{{0, 1}, {1, 2}, {2, 0}}}},
-			Props:     &Properties{"test": {Type: PROP_TYPE_STRING, Value: "value2"}},
 		},
 	}
 
@@ -569,20 +509,6 @@ func TestMeshNodesMarshalUnmarshal(t *testing.T) {
 				}
 				if len(unmarshaledNode.EdgeGroup) != len(originalNode.EdgeGroup) {
 					t.Errorf("Version %d: node %d edgeGroup count mismatch: got %d, want %d", version, i, len(unmarshaledNode.EdgeGroup), len(originalNode.EdgeGroup))
-				}
-
-				// 验证Props字段（仅在V5及以上版本）
-				if version >= V5 {
-					if unmarshaledNode.Props == nil {
-						t.Errorf("Version %d: node %d Props should not be nil", version, i)
-					} else if len(*unmarshaledNode.Props) != len(*originalNode.Props) {
-						t.Errorf("Version %d: node %d Props count mismatch: got %d, want %d", version, i, len(*unmarshaledNode.Props), len(*originalNode.Props))
-					}
-				} else {
-					// 对于V5以下版本，Props应该为nil
-					if unmarshaledNode.Props != nil && len(*unmarshaledNode.Props) > 0 {
-						t.Errorf("Version %d: node %d Props should be nil or empty for versions below V5", version, i)
-					}
 				}
 			}
 
@@ -1853,8 +1779,8 @@ func TestMeshInstanceNodesMarshalUnmarshal(t *testing.T) {
 
 func TestInstanceMeshPropsArray(t *testing.T) {
 	// 创建测试数据
-	transform1 := dmat.Ident
-	transform2 := dmat.Ident
+	transform1 := mat4d.Ident
+	transform2 := mat4d.Ident
 	transform2[0][0] = 2.0
 
 	// 创建两个不同的Properties
@@ -1867,7 +1793,7 @@ func TestInstanceMeshPropsArray(t *testing.T) {
 	props2["id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(2)}
 
 	instanceMesh := &InstanceMesh{
-		Transfors: []*dmat.T{&transform1, &transform2},
+		Transfors: []*mat4d.T{&transform1, &transform2},
 		Features:  []uint64{100, 200},
 		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
 		Mesh: &BaseMesh{
@@ -1942,8 +1868,8 @@ func TestInstanceMeshPropsArray(t *testing.T) {
 
 func TestInstanceMeshPropsArrayMismatch(t *testing.T) {
 	// 创建测试数据，Props数量与Transfors/Features不匹配
-	transform1 := dmat.Ident
-	transform2 := dmat.Ident
+	transform1 := mat4d.Ident
+	transform2 := mat4d.Ident
 	transform2[0][0] = 2.0
 
 	// 只创建一个Properties，但有两个Transfors/Features
@@ -1951,7 +1877,7 @@ func TestInstanceMeshPropsArrayMismatch(t *testing.T) {
 	props1["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "instance1"}
 
 	instanceMesh := &InstanceMesh{
-		Transfors: []*dmat.T{&transform1, &transform2},
+		Transfors: []*mat4d.T{&transform1, &transform2},
 		Features:  []uint64{100, 200},
 		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
 		Mesh: &BaseMesh{
@@ -2007,10 +1933,10 @@ func TestInstanceMeshPropsArrayMismatch(t *testing.T) {
 
 func TestInstanceMeshEmptyProps(t *testing.T) {
 	// 创建测试数据，没有Props
-	transform1 := dmat.Ident
+	transform1 := mat4d.Ident
 
 	instanceMesh := &InstanceMesh{
-		Transfors: []*dmat.T{&transform1},
+		Transfors: []*mat4d.T{&transform1},
 		Features:  []uint64{100},
 		BBox:      &[6]float64{-1, -1, -1, 1, 1, 1},
 		Mesh: &BaseMesh{
