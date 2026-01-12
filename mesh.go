@@ -132,15 +132,15 @@ func NewMesh() *Mesh {
 	return &Mesh{Version: V5, Props: &Properties{}}
 }
 
-func (m *Mesh) NodeCount() int {
+func (m *BaseMesh) NodeCount() int {
 	return len(m.Nodes)
 }
 
-func (m *Mesh) MaterialCount() int {
+func (m *BaseMesh) MaterialCount() int {
 	return len(m.Materials)
 }
 
-func (m *Mesh) ComputeBBox() dvec3.Box {
+func (m *BaseMesh) ComputeBBox() dvec3.Box {
 	if len(m.Nodes) == 0 {
 		return dvec3.Box{}
 	}
