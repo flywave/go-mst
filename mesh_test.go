@@ -47,14 +47,14 @@ func TestNewMesh(t *testing.T) {
 	if mesh == nil {
 		t.Fatal("NewMesh returned nil")
 	}
-	if mesh.Version != V5 {
-		t.Errorf("Expected version V5, got %d", mesh.Version)
+	if mesh.Version != V6 {
+		t.Errorf("Expected version V6, got %d", mesh.Version)
 	}
 	if len(mesh.Materials) != 0 || len(mesh.Nodes) != 0 {
 		t.Errorf("Expected empty mesh, got materials=%d, nodes=%d", len(mesh.Materials), len(mesh.Nodes))
 	}
 	if mesh.Props == nil {
-		t.Errorf("Expected non-nil Props in V5 mesh")
+		t.Errorf("Expected non-nil Props in V6 mesh")
 	}
 }
 
@@ -594,9 +594,8 @@ func TestMeshV5Properties(t *testing.T) {
 	props["visible"] = PropsValue{Type: PROP_TYPE_BOOL, Value: true}
 	props["scale"] = PropsValue{Type: PROP_TYPE_FLOAT, Value: 1.5}
 
-	// 创建测试用的Mesh
-	mesh := NewMesh()
-	mesh.Props = &props
+	// 创建测试用的Mesh，显式设置为V5版本
+	mesh := &Mesh{Version: V5, Props: &props}
 
 	// 序列化
 	var buf bytes.Buffer
@@ -1978,5 +1977,142 @@ func TestInstanceMeshEmptyProps(t *testing.T) {
 	// Props应该都是nil
 	if unmarshaled.Props[0] != nil {
 		t.Error("Props[0] should be nil")
+	}
+}
+
+// TestMeshV6GeoRef 测试V6版本的GeoRef序列化和反序列化
+func TestMeshV6GeoRef(t *testing.T) {
+	// 创建测试用的GeoRef
+	geoRef := &GeoRef{
+		EcefOrigin:   [3]float64{100.0, 200.0, 300.0},
+		LatLonOrigin: [3]float64{39.9, 116.4, 50.0},
+	}
+
+	// 创建测试用的Mesh，显式设置为V6版本
+	mesh := &Mesh{Version: V6, GeoRef: geoRef}
+
+	// 序列化
+	var buf bytes.Buffer
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
+
+	// 反序列化
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+
+	// 验证结果
+	if readMesh.Version != V6 {
+		t.Errorf("Version = %d, want %d", readMesh.Version, V6)
+	}
+
+	// 检查GeoRef
+	if readMesh.GeoRef == nil {
+		t.Fatal("GeoRef is nil for V6 mesh")
+	}
+
+	// 检查EcefOrigin
+	if readMesh.GeoRef.EcefOrigin != geoRef.EcefOrigin {
+		t.Errorf("EcefOrigin = %v, want %v", readMesh.GeoRef.EcefOrigin, geoRef.EcefOrigin)
+	}
+
+	// 检查LatLonOrigin
+	if readMesh.GeoRef.LatLonOrigin != geoRef.LatLonOrigin {
+		t.Errorf("LatLonOrigin = %v, want %v", readMesh.GeoRef.LatLonOrigin, geoRef.LatLonOrigin)
+	}
+}
+
+// TestMeshV6WithPropsAndGeoRef 测试V6版本同时有Props和GeoRef的情况
+func TestMeshV6WithPropsAndGeoRef(t *testing.T) {
+	// 创建测试用的Properties
+	props := make(Properties)
+	props["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "test mesh with geo"}
+	props["id"] = PropsValue{Type: PROP_TYPE_INT, Value: int64(999)}
+
+	// 创建测试用的GeoRef
+	geoRef := &GeoRef{
+		EcefOrigin:   [3]float64{-1000.0, -2000.0, -3000.0},
+		LatLonOrigin: [3]float64{31.2, 121.5, 10.0},
+	}
+
+	// 创建测试用的Mesh，显式设置为V6版本
+	mesh := &Mesh{Version: V6, Props: &props, GeoRef: geoRef}
+
+	// 序列化
+	var buf bytes.Buffer
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
+
+	// 反序列化
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+
+	// 验证版本
+	if readMesh.Version != V6 {
+		t.Errorf("Version = %d, want %d", readMesh.Version, V6)
+	}
+
+	// 检查Properties
+	if readMesh.Props == nil {
+		t.Fatal("Props is nil for V6 mesh")
+	}
+
+	readProps := *readMesh.Props
+	if len(readProps) != 2 {
+		t.Errorf("Props count = %d, want 2", len(readProps))
+	}
+
+	// 检查GeoRef
+	if readMesh.GeoRef == nil {
+		t.Fatal("GeoRef is nil for V6 mesh")
+	}
+
+	// 检查EcefOrigin
+	if readMesh.GeoRef.EcefOrigin != geoRef.EcefOrigin {
+		t.Errorf("EcefOrigin = %v, want %v", readMesh.GeoRef.EcefOrigin, geoRef.EcefOrigin)
+	}
+
+	// 检查LatLonOrigin
+	if readMesh.GeoRef.LatLonOrigin != geoRef.LatLonOrigin {
+		t.Errorf("LatLonOrigin = %v, want %v", readMesh.GeoRef.LatLonOrigin, geoRef.LatLonOrigin)
+	}
+}
+
+// TestMeshV6WithoutGeoRef 测试V6版本没有GeoRef的情况
+func TestMeshV6WithoutGeoRef(t *testing.T) {
+	// 创建测试用的Mesh，显式设置为V6版本，但不设置GeoRef
+	mesh := &Mesh{Version: V6}
+
+	// 序列化
+	var buf bytes.Buffer
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
+
+	// 反序列化
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+
+	// 验证版本
+	if readMesh.Version != V6 {
+		t.Errorf("Version = %d, want %d", readMesh.Version, V6)
+	}
+
+	// 检查GeoRef应该为nil
+	if readMesh.GeoRef != nil {
+		t.Error("GeoRef should be nil for V6 mesh without GeoRef")
+	}
+}
+
+// TestMeshBackwardCompatibility 测试向后兼容性
+func TestMeshBackwardCompatibility(t *testing.T) {
+	// 测试V5版本读取时，GeoRef应该为nil
+	mesh := &Mesh{Version: V5, Props: &Properties{}}
+	var buf bytes.Buffer
+	if err := MeshMarshal(&buf, mesh); err != nil {
+		t.Fatalf("MeshMarshal failed: %v", err)
+	}
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	if readMesh.GeoRef != nil {
+		t.Error("GeoRef should be nil when reading V5 mesh")
 	}
 }

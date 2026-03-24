@@ -7,6 +7,7 @@ const V2 uint32 = 2
 const V3 uint32 = 3
 const V4 uint32 = 4
 const V5 uint32 = 5
+const V6 uint32 = 6
 
 const (
 	MESH_TRIANGLE_MATERIAL_TYPE_COLOR   = 0

@@ -585,9 +585,26 @@ func MeshMarshal(wt io.Writer, ms *Mesh) error {
 			if err := writeLittleByte(wt, uint32(1)); err != nil {
 				return err
 			}
-			return PropertiesMarshal(wt, ms.Props)
+			if err := PropertiesMarshal(wt, ms.Props); err != nil {
+				return err
+			}
 		} else {
 			// 如果Props为nil，写入标记位0
+			if err := writeLittleByte(wt, uint32(0)); err != nil {
+				return err
+			}
+		}
+	}
+	// V6 版本序列化GeoRef
+	if ms.Version >= V6 {
+		if ms.GeoRef != nil {
+			if err := writeLittleByte(wt, uint32(1)); err != nil {
+				return err
+			}
+			if err := GeoRefMarshal(wt, ms.GeoRef); err != nil {
+				return err
+			}
+		} else {
 			if err := writeLittleByte(wt, uint32(0)); err != nil {
 				return err
 			}
@@ -628,6 +645,21 @@ func MeshUnMarshal(rd io.Reader) *Mesh {
 			}
 		} else {
 			ms.Props = nil
+		}
+	}
+	// V6 版本反序列化GeoRef
+	if ms.Version >= V6 {
+		var hasGeoRef uint32
+		if err := readLittleByte(rd, &hasGeoRef); err != nil {
+			return nil
+		}
+		if hasGeoRef > 0 {
+			ms.GeoRef = GeoRefUnMarshal(rd)
+			if ms.GeoRef == nil {
+				return nil
+			}
+		} else {
+			ms.GeoRef = nil
 		}
 	}
 	return &ms
@@ -1069,4 +1101,18 @@ func MeshNodeUnMarshalWithVersion(rd io.Reader, v uint32) *MeshNode {
 	}
 
 	return &nd
+}
+
+func GeoRefMarshal(wt io.Writer, geoRef *GeoRef) error {
+	if err := writeLittleByte(wt, geoRef.EcefOrigin[:]); err != nil {
+		return err
+	}
+	return writeLittleByte(wt, geoRef.LatLonOrigin[:])
+}
+
+func GeoRefUnMarshal(rd io.Reader) *GeoRef {
+	geoRef := &GeoRef{}
+	readLittleByte(rd, geoRef.EcefOrigin[:])
+	readLittleByte(rd, geoRef.LatLonOrigin[:])
+	return geoRef
 }

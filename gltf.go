@@ -550,8 +550,9 @@ func fillMaterials(doc *gltf.Document, materials []MeshMaterial) error {
 	textureMap := make(map[int32]uint32)
 	useExtension := false
 
-	for _, material := range materials {
+	for i, material := range materials {
 		gltfMaterial := &gltf.Material{
+			Name:        fmt.Sprintf("Material_%d", i),
 			DoubleSided: true,
 			AlphaMode:   gltf.AlphaMask,
 			PBRMetallicRoughness: &gltf.PBRMetallicRoughness{

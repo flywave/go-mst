@@ -121,15 +121,21 @@ type BaseMesh struct {
 	Code      uint32         `json:"code,omitempty"`
 }
 
+type GeoRef struct {
+	EcefOrigin   [3]float64 `json:"ecefOrigin,omitempty"`
+	LatLonOrigin [3]float64 `json:"latLonOrigin,omitempty"`
+}
+
 type Mesh struct {
 	BaseMesh
 	Version   uint32 `json:"version"`
 	Instances []*InstanceMesh
 	Props     *Properties `json:"props,omitempty"`
+	GeoRef    *GeoRef     `json:"geoRef,omitempty"`
 }
 
 func NewMesh() *Mesh {
-	return &Mesh{Version: V5, Props: &Properties{}}
+	return &Mesh{Version: V6, Props: &Properties{}}
 }
 
 func (m *BaseMesh) NodeCount() int {
