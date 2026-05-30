@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-		"image/png"
+	"image/png"
 	"io"
 
 	mat4d "github.com/flywave/go3d/float64/mat4"
@@ -146,7 +146,7 @@ func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
 		}
 	}
 
-	if err := buildGltfFromBaseMesh(doc, &mesh.BaseMesh, nil, exportOutline, nil); err != nil {
+	if err := buildGltfFromBaseMesh(doc, &mesh.BaseMesh, nil, exportOutline); err != nil {
 		return err
 	}
 
@@ -170,7 +170,7 @@ func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
 			}
 		}
 
-		if err := buildGltfFromBaseMesh(doc, instance.Mesh, instance.Transfors, false, instance.Joints); err != nil {
+		if err := buildGltfFromBaseMesh(doc, instance.Mesh, instance.Transfors, false); err != nil {
 			return err
 		}
 	}
@@ -432,7 +432,7 @@ func buildMeshPrimitives(ctx *buildContext, accessors []*gltf.Accessor, node *Me
 }
 
 // buildGltfFromBaseMesh 从基础网格构建GLTF
-func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat4d.T, exportOutline bool, joints []*JointData) error {
+func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat4d.T, exportOutline bool) error {
 	ctx := &buildContext{
 		mtlSize: uint32(len(doc.Materials)),
 	}
@@ -484,20 +484,6 @@ func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat
 
 			if err := instext.WriteInstancing(doc, instData, instext.DefaultConfig()); err != nil {
 				return err
-			}
-			if len(joints) > 0 {
-				if gltfNode.Extensions == nil {
-					gltfNode.Extensions = make(gltf.Extensions)
-				}
-				jext := make([]map[string]interface{}, len(joints))
-				for i, jd := range joints {
-					jext[i] = map[string]interface{}{
-						"jointId": jd.JointId,
-						"value":   jd.Value,
-						"dynamic": jd.Dynamic,
-					}
-				}
-				gltfNode.Extensions["FLYWAVE_joint_metadata"] = jext
 			}
 
 			doc.Nodes = append(doc.Nodes, gltfNode)

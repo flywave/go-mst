@@ -198,7 +198,7 @@ func TestBuildGltfFromBaseMesh(t *testing.T) {
 		},
 	}
 
-	err := buildGltfFromBaseMesh(doc, baseMesh, nil, false, nil)
+	err := buildGltfFromBaseMesh(doc, baseMesh, nil, false)
 	if err != nil {
 		t.Fatalf("buildGltfFromBaseMesh failed: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestBuildGltfWithTransforms(t *testing.T) {
 	transform[3][0] = 10 // 平移x
 	transforms := []*mat4d.T{&transform}
 
-	err := buildGltfFromBaseMesh(doc, baseMesh, transforms, false, nil)
+	err := buildGltfFromBaseMesh(doc, baseMesh, transforms, false)
 	if err != nil {
 		t.Fatalf("buildGltfFromBaseMesh with transforms failed: %v", err)
 	}

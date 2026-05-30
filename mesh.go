@@ -87,20 +87,13 @@ func (n *MeshNode) ReComputeNormal() {
 	n.Normals = normals
 }
 
-type JointData struct {
-	JointId string  `json:"jointId"`
-	Value   float64 `json:"value,omitempty"`
-	Dynamic bool    `json:"dynamic,omitempty"`
-}
-
 type InstanceMesh struct {
 	Transfors []*dmat.T
 	Features  []uint64
 	BBox      *[6]float64
 	Mesh      *BaseMesh
-	Props     []*Properties          `json:"props,omitempty"`
+	Props     []*Properties `json:"props,omitempty"`
 	Hash      uint64
-	Joints    []*JointData `json:"joints,omitempty"`
 }
 
 func (nd *MeshNode) GetBoundbox() *[6]float64 {
