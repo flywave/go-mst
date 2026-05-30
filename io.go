@@ -580,8 +580,8 @@ func MeshMarshal(wt io.Writer, ms *Mesh) error {
 	}
 	// V5 版本序列化新增属性
 	if ms.Version >= V5 {
-		if ms.Props != nil && len(*ms.Props) > 0 {
-			// 先写入标记位1表示有Properties
+		if ms.Props != nil {
+			// 写入标记位1表示有Properties
 			if err := writeLittleByte(wt, uint32(1)); err != nil {
 				return err
 			}
@@ -792,7 +792,11 @@ func MeshInstanceNodeMarshal(wt io.Writer, instNd *InstanceMesh, v uint32) error
 			return err
 		}
 	}
-	if err := writeLittleByte(wt, instNd.BBox); err != nil {
+	bbox := instNd.BBox
+	if bbox == nil {
+		bbox = &[6]float64{}
+	}
+	if err := writeLittleByte(wt, bbox); err != nil {
 		return err
 	}
 	// 序列化Mesh字段
@@ -1115,4 +1119,13 @@ func GeoRefUnMarshal(rd io.Reader) *GeoRef {
 	readLittleByte(rd, geoRef.EcefOrigin[:])
 	readLittleByte(rd, geoRef.LatLonOrigin[:])
 	return geoRef
+}
+
+func UpgradeMeshFile(path string) error {
+	ms, err := MeshReadFrom(path)
+	if err != nil {
+		return err
+	}
+	UpgradeMesh(ms)
+	return MeshWriteTo(path, ms)
 }

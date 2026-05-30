@@ -1107,6 +1107,432 @@ func versionName(v uint32) string {
 	}
 }
 
+func makeTransform() *mat4d.T {
+	m := mat4d.Ident
+	return &m
+}
+
+func TestUpgradeMeshFromV1(t *testing.T) {
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{
+				&BaseMaterial{Color: [3]byte{255, 0, 0}},
+				&PbrMaterial{
+					TextureMaterial: TextureMaterial{
+						BaseMaterial: BaseMaterial{Color: [3]byte{0, 255, 0}},
+					},
+					Emissive: [3]byte{1, 2, 3}, Metallic: 0.5, Roughness: 0.3,
+				},
+			},
+			Nodes: []*MeshNode{
+				{
+					Vertices:  []vec3.T{{0, 0, 0}},
+					FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+				},
+			},
+			Code: 12345,
+		},
+		Version: V1,
+		Instances: []*InstanceMesh{
+			{
+				Transfors: []*mat4d.T{makeTransform()},
+				Features:  []uint64{100, 200},
+				BBox:      &[6]float64{},
+				Mesh:      &BaseMesh{},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	UpgradeMesh(readMesh)
+
+	if readMesh.Version != V6 {
+		t.Errorf("Version = %d, want V6", readMesh.Version)
+	}
+	if readMesh.Props == nil {
+		t.Error("Props should be non-nil after upgrade")
+	}
+	if len(readMesh.Instances) != 1 {
+		t.Fatalf("expected 1 instance, got %d", len(readMesh.Instances))
+	}
+	if readMesh.Instances[0].Props == nil {
+		t.Error("Instance Props should be non-nil after upgrade")
+	}
+	if len(readMesh.Instances[0].Props) != 2 {
+		t.Errorf("Instance Props length = %d, want 2 (matching Transfors count)", len(readMesh.Instances[0].Props))
+	}
+	if readMesh.Instances[0].BBox == nil {
+		t.Error("Instance BBox should be non-nil after upgrade")
+	}
+
+	var reBuf bytes.Buffer
+	if err := MeshMarshal(&reBuf, readMesh); err != nil {
+		t.Fatalf("Re-marshal after upgrade failed: %v", err)
+	}
+
+	reReadMesh := MeshUnMarshal(bytes.NewReader(reBuf.Bytes()))
+	if reReadMesh.Version != V6 {
+		t.Errorf("After re-serialize, Version = %d, want V6", reReadMesh.Version)
+	}
+	if reReadMesh.Props == nil {
+		t.Error("Props should be non-nil after re-serialize")
+	}
+}
+
+func TestUpgradeMeshFromV2(t *testing.T) {
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{
+				&PbrMaterial{
+					TextureMaterial: TextureMaterial{
+						BaseMaterial: BaseMaterial{Color: [3]byte{100, 100, 100}},
+					},
+					Emissive: [3]byte{10, 20, 30}, Metallic: 0.9, Roughness: 0.1,
+				},
+			},
+			Nodes: []*MeshNode{
+				{
+					Vertices:  []vec3.T{{0, 0, 0}},
+					FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+				},
+			},
+			Code: 0,
+		},
+		Version: V2,
+	}
+
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	UpgradeMesh(readMesh)
+
+	if readMesh.Version != V6 {
+		t.Errorf("V2 upgrade: Version = %d, want V6", readMesh.Version)
+	}
+	if readMesh.Props == nil {
+		t.Error("V2 upgrade: Props should be non-nil")
+	}
+}
+
+func TestUpgradeMeshFromV3(t *testing.T) {
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{
+				&LambertMaterial{
+					TextureMaterial: TextureMaterial{
+						BaseMaterial: BaseMaterial{Color: [3]byte{0, 0, 255}},
+					},
+				},
+			},
+			Nodes: []*MeshNode{
+				{
+					Vertices:  []vec3.T{{0, 0, 0}},
+					FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+				},
+			},
+			Code: 777,
+		},
+		Version: V3,
+		Instances: []*InstanceMesh{
+			{
+				Transfors: []*mat4d.T{makeTransform()},
+				Features:  []uint64{1, 2, 3, 4, 5},
+				BBox:      &[6]float64{},
+				Mesh:      &BaseMesh{},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	UpgradeMesh(readMesh)
+
+	if readMesh.Version != V6 {
+		t.Errorf("V3 upgrade: Version = %d, want V6", readMesh.Version)
+	}
+	if len(readMesh.Instances[0].Props) != 5 {
+		t.Errorf("V3 upgrade: instance Props length = %d, want 5", len(readMesh.Instances[0].Props))
+	}
+}
+
+func TestUpgradeMeshFromV4(t *testing.T) {
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{
+				&PhongMaterial{
+					LambertMaterial: LambertMaterial{
+						TextureMaterial: TextureMaterial{
+							BaseMaterial: BaseMaterial{Color: [3]byte{128, 128, 128}},
+						},
+					},
+					Specular: [3]byte{255, 255, 255}, Shininess: 64,
+				},
+			},
+			Nodes: []*MeshNode{
+				{
+					Vertices:  []vec3.T{{0, 0, 0}},
+					FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+				},
+			},
+			Code: 9999,
+		},
+		Version: V4,
+	}
+
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	UpgradeMesh(readMesh)
+
+	if readMesh.Version != V6 {
+		t.Errorf("V4 upgrade: Version = %d, want V6", readMesh.Version)
+	}
+	if readMesh.Props == nil {
+		t.Error("V4 upgrade: Props should be non-nil")
+	}
+	if readMesh.Code != 9999 {
+		t.Errorf("V4 upgrade: Code = %d, want 9999", readMesh.Code)
+	}
+}
+
+func TestUpgradeMeshFromV5(t *testing.T) {
+	props := make(Properties)
+	props["name"] = PropsValue{Type: PROP_TYPE_STRING, Value: "v5 mesh"}
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{
+				&BaseMaterial{Color: [3]byte{255, 0, 0}},
+			},
+			Nodes: []*MeshNode{
+				{
+					Vertices:  []vec3.T{{0, 0, 0}},
+					FaceGroup: []*MeshTriangle{{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 0, 0}}}}},
+				},
+			},
+		},
+		Version: V5,
+		Props:   &props,
+	}
+
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	UpgradeMesh(readMesh)
+
+	if readMesh.Version != V6 {
+		t.Errorf("V5 upgrade: Version = %d, want V6", readMesh.Version)
+	}
+	if readMesh.Props == nil {
+		t.Error("V5 upgrade: Props should not be nil")
+	}
+	if (*readMesh.Props)["name"].Value.(string) != "v5 mesh" {
+		t.Error("V5 upgrade: Props data lost")
+	}
+}
+
+func TestUpgradeMeshFromV5WithInstanceProps(t *testing.T) {
+	instanceProps := make(Properties)
+	instanceProps["instance_key"] = PropsValue{Type: PROP_TYPE_STRING, Value: "keep_me"}
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{0, 255, 0}}},
+			Nodes:     []*MeshNode{{Vertices: []vec3.T{{0, 0, 0}}}},
+		},
+		Version: V5,
+		Instances: []*InstanceMesh{
+			{
+				Transfors: []*mat4d.T{makeTransform()},
+				Features:  []uint64{100},
+				BBox:      &[6]float64{},
+				Mesh:      &BaseMesh{},
+				Props:     []*Properties{&instanceProps},
+				Hash:      1,
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	MeshMarshal(&buf, mesh)
+
+	readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+	UpgradeMesh(readMesh)
+
+	if readMesh.Version != V6 {
+		t.Errorf("Version = %d, want V6", readMesh.Version)
+	}
+	if len(readMesh.Instances[0].Props) != 1 {
+		t.Fatalf("instance Props length = %d, want 1", len(readMesh.Instances[0].Props))
+	}
+	if (*readMesh.Instances[0].Props[0])["instance_key"].Value.(string) != "keep_me" {
+		t.Error("Instance Props data lost during upgrade")
+	}
+}
+
+func TestUpgradeMeshAlreadyV6(t *testing.T) {
+	geoRef := &GeoRef{EcefOrigin: [3]float64{1, 2, 3}, LatLonOrigin: [3]float64{10, 20, 30}}
+	props := make(Properties)
+	props["existing"] = PropsValue{Type: PROP_TYPE_BOOL, Value: true}
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 0, 0}}},
+			Nodes:     []*MeshNode{{Vertices: []vec3.T{{0, 0, 0}}}},
+		},
+		Version: V6,
+		Props:   &props,
+		GeoRef:  geoRef,
+	}
+
+	UpgradeMesh(mesh)
+
+	if mesh.Version != V6 {
+		t.Errorf("Version = %d, want V6", mesh.Version)
+	}
+	if mesh.Props != &props {
+		t.Error("Props pointer changed")
+	}
+	if mesh.GeoRef != geoRef {
+		t.Error("GeoRef pointer changed")
+	}
+}
+
+func TestUpgradeMeshFileRoundTrip(t *testing.T) {
+	tempDir := t.TempDir()
+	mstFile := filepath.Join(tempDir, "upgrade_test.mst")
+
+	mesh := &Mesh{
+		BaseMesh: BaseMesh{
+			Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{255, 0, 0}}},
+			Nodes:     []*MeshNode{{Vertices: []vec3.T{{0, 0, 0}}}},
+		},
+		Version: V1,
+	}
+
+	if err := MeshWriteTo(mstFile, mesh); err != nil {
+		t.Fatalf("MeshWriteTo failed: %v", err)
+	}
+
+	if err := UpgradeMeshFile(mstFile); err != nil {
+		t.Fatalf("UpgradeMeshFile failed: %v", err)
+	}
+
+	upgraded, err := MeshReadFrom(mstFile)
+	if err != nil {
+		t.Fatalf("MeshReadFrom after upgrade failed: %v", err)
+	}
+
+	if upgraded.Version != V6 {
+		t.Errorf("After UpgradeMeshFile, Version = %d, want V6", upgraded.Version)
+	}
+	if upgraded.Props == nil {
+		t.Error("Props should be non-nil after file upgrade")
+	}
+}
+
+func TestUpgradeMeshFileNonExistent(t *testing.T) {
+	err := UpgradeMeshFile("/nonexistent/path.mst")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+}
+
+func TestUpgradeMeshAllVersions(t *testing.T) {
+	for version := V1; version <= V5; version++ {
+		t.Run(versionName(version), func(t *testing.T) {
+			mesh := &Mesh{
+				BaseMesh: BaseMesh{
+					Materials: []MeshMaterial{
+						&PbrMaterial{
+							TextureMaterial: TextureMaterial{
+								BaseMaterial: BaseMaterial{Color: [3]byte{255, 0, 0}},
+								Texture:      &Texture{Id: 1, Name: "t", Size: [2]uint64{1, 1}, Format: TEXTURE_FORMAT_RGBA, Data: []byte{1, 2, 3, 4}},
+							},
+							Metallic: 0.5, Roughness: 0.5, Emissive: [3]byte{10, 10, 10},
+						},
+					},
+					Nodes: []*MeshNode{
+						{
+							Vertices:  []vec3.T{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}},
+							Normals:   []vec3.T{{0, 0, 1}, {0, 0, 1}, {0, 0, 1}},
+							TexCoords: []vec2.T{{0, 0}, {1, 0}, {0, 1}},
+							FaceGroup: []*MeshTriangle{
+								{Batchid: 0, Faces: []*Face{{Vertex: [3]uint32{0, 1, 2}, Normal: &[3]uint32{0, 1, 2}, Uv: &[3]uint32{0, 1, 2}}}},
+							},
+						},
+					},
+					Code: 42,
+				},
+				Version: version,
+				Instances: []*InstanceMesh{
+					{
+						Transfors: []*mat4d.T{makeTransform()},
+						Features:  []uint64{1, 2},
+						BBox:      &[6]float64{},
+						Mesh: &BaseMesh{
+							Materials: []MeshMaterial{&BaseMaterial{Color: [3]byte{0, 255, 0}}},
+							Nodes:     []*MeshNode{{Vertices: []vec3.T{{0, 0, 0}}}},
+							Code:      100,
+						},
+					},
+				},
+			}
+
+			var buf bytes.Buffer
+			MeshMarshal(&buf, mesh)
+			readMesh := MeshUnMarshal(bytes.NewReader(buf.Bytes()))
+			UpgradeMesh(readMesh)
+
+			if readMesh.Version != V6 {
+				t.Errorf("Version = %d, want V6", readMesh.Version)
+			}
+			if readMesh.Props == nil {
+				t.Error("Props should be non-nil")
+			}
+			if len(readMesh.Materials) != 1 {
+				t.Errorf("Materials = %d, want 1", len(readMesh.Materials))
+			}
+			if len(readMesh.Nodes) != 1 {
+				t.Errorf("Nodes = %d, want 1", len(readMesh.Nodes))
+			}
+			if version >= V4 && readMesh.Code != 42 {
+				t.Errorf("Code = %d, want 42", readMesh.Code)
+			}
+
+			if len(readMesh.Instances) != 1 {
+				t.Fatalf("Instances = %d, want 1", len(readMesh.Instances))
+			}
+			if readMesh.Instances[0].Props == nil {
+				t.Error("Instance Props should be non-nil")
+			}
+			if len(readMesh.Instances[0].Props) != 2 {
+				t.Errorf("Instance Props length = %d, want 2", len(readMesh.Instances[0].Props))
+			}
+			if version >= V4 && readMesh.Instances[0].Mesh.Code != 100 {
+				t.Errorf("Instance Code = %d, want 100", readMesh.Instances[0].Mesh.Code)
+			}
+
+			var reBuf bytes.Buffer
+			if err := MeshMarshal(&reBuf, readMesh); err != nil {
+				t.Fatalf("Re-marshal after upgrade failed: %v", err)
+			}
+			reRead := MeshUnMarshal(bytes.NewReader(reBuf.Bytes()))
+			if reRead.Version != V6 {
+				t.Errorf("After re-serialize: Version = %d, want V6", reRead.Version)
+			}
+			if reRead.Props == nil {
+				t.Error("After re-serialize: Props should not be nil")
+			}
+		})
+	}
+}
+
 func TestSortImport(t *testing.T) {
 	sort.Ints([]int{3, 1, 2})
 }

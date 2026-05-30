@@ -138,6 +138,27 @@ func NewMesh() *Mesh {
 	return &Mesh{Version: V6, Props: &Properties{}}
 }
 
+func UpgradeMesh(ms *Mesh) {
+	ms.Version = V6
+
+	if ms.Props == nil {
+		ms.Props = &Properties{}
+	}
+
+	for _, inst := range ms.Instances {
+		if inst.BBox == nil {
+			inst.BBox = &[6]float64{}
+		}
+		if inst.Props == nil {
+			expectedLen := len(inst.Transfors)
+			if len(inst.Features) > expectedLen {
+				expectedLen = len(inst.Features)
+			}
+			inst.Props = make([]*Properties, expectedLen)
+		}
+	}
+}
+
 func (m *BaseMesh) NodeCount() int {
 	return len(m.Nodes)
 }
