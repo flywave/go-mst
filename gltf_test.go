@@ -198,7 +198,7 @@ func TestBuildGltfFromBaseMesh(t *testing.T) {
 		},
 	}
 
-	err := buildGltfFromBaseMesh(doc, baseMesh, nil, false)
+	err := buildGltfFromBaseMesh(doc, baseMesh, nil, false, nil)
 	if err != nil {
 		t.Fatalf("buildGltfFromBaseMesh failed: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestBuildGltfWithTransforms(t *testing.T) {
 	transform[3][0] = 10 // 平移x
 	transforms := []*mat4d.T{&transform}
 
-	err := buildGltfFromBaseMesh(doc, baseMesh, transforms, false)
+	err := buildGltfFromBaseMesh(doc, baseMesh, transforms, false, nil)
 	if err != nil {
 		t.Fatalf("buildGltfFromBaseMesh with transforms failed: %v", err)
 	}
@@ -265,11 +265,22 @@ func TestBuildGltfWithTransforms(t *testing.T) {
 		t.Errorf("Expected 1 node, got %d", len(doc.Nodes))
 	}
 
-	// 验证变换是否正确应用
+	// 使用EXT_mesh_gpu_instancing，node本身为identity变换
 	node := doc.Nodes[0]
-	if node.Translation[0] != 10 {
-		t.Errorf("Expected translation x=10, got %f", node.Translation[0])
+	if node.Translation != [3]float32{0, 0, 0} {
+		t.Errorf("Expected identity translation for instanced node, got %v", node.Translation)
 	}
+
+	// 验证EXT_mesh_gpu_instancing扩展存在
+	if !doc.HasExtensionUsed("EXT_mesh_gpu_instancing") {
+		t.Error("EXT_mesh_gpu_instancing should be in ExtensionsUsed")
+	}
+
+	ext, ok := doc.Extensions["EXT_mesh_gpu_instancing"]
+	if !ok {
+		t.Fatal("EXT_mesh_gpu_instancing extension not found in document")
+	}
+	_ = ext
 }
 
 // TestBuildTexture 测试纹理构建

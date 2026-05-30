@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"image/png"
+		"image/png"
 	"io"
 
 	mat4d "github.com/flywave/go3d/float64/mat4"
+	mat4 "github.com/flywave/go3d/mat4"
 
 	"github.com/flywave/gltf"
+	instext "github.com/flywave/gltf/ext/instance"
 	"github.com/flywave/gltf/ext/specular"
 )
 
@@ -144,7 +146,7 @@ func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
 		}
 	}
 
-	if err := buildGltfFromBaseMesh(doc, &mesh.BaseMesh, nil, exportOutline); err != nil {
+	if err := buildGltfFromBaseMesh(doc, &mesh.BaseMesh, nil, exportOutline, nil); err != nil {
 		return err
 	}
 
@@ -168,7 +170,7 @@ func BuildGltf(doc *gltf.Document, mesh *Mesh, exportOutline bool) error {
 			}
 		}
 
-		if err := buildGltfFromBaseMesh(doc, instance.Mesh, instance.Transfors, false); err != nil {
+		if err := buildGltfFromBaseMesh(doc, instance.Mesh, instance.Transfors, false, instance.Joints); err != nil {
 			return err
 		}
 	}
@@ -430,7 +432,7 @@ func buildMeshPrimitives(ctx *buildContext, accessors []*gltf.Accessor, node *Me
 }
 
 // buildGltfFromBaseMesh 从基础网格构建GLTF
-func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat4d.T, exportOutline bool) error {
+func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat4d.T, exportOutline bool, joints []*JointData) error {
 	ctx := &buildContext{
 		mtlSize: uint32(len(doc.Materials)),
 	}
@@ -447,13 +449,12 @@ func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat
 		} else {
 			doc.BufferViews = buildMeshBufferViews(ctx, doc.Buffers[0], doc.BufferViews, node)
 
-			mesh, accessors := buildMeshPrimitives(ctx, doc.Accessors, node)
-			doc.Meshes = append(doc.Meshes, mesh)
+			m, accessors := buildMeshPrimitives(ctx, doc.Accessors, node)
+			doc.Meshes = append(doc.Meshes, m)
 			doc.Accessors = accessors
 		}
 
 		if transforms == nil {
-			// 无变换矩阵，直接添加节点
 			nodeIndex := uint32(len(doc.Nodes))
 			gltfNode := &gltf.Node{Mesh: &meshIndex}
 
@@ -467,23 +468,57 @@ func buildGltfFromBaseMesh(doc *gltf.Document, mesh *BaseMesh, transforms []*mat
 			doc.Nodes = append(doc.Nodes, gltfNode)
 			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, nodeIndex)
 		} else {
-			// 应用变换矩阵
-			for _, transform := range transforms {
-				position, rotation, scale := mat4d.Decompose(transform)
-				gltfNode := &gltf.Node{
-					Mesh:        &meshIndex,
-					Translation: [3]float32{float32(position[0]), float32(position[1]), float32(position[2])},
-					Rotation:    [4]float32{float32(rotation[0]), float32(rotation[1]), float32(rotation[2]), float32(rotation[3])},
-					Scale:       [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])},
-				}
-
-				doc.Nodes = append(doc.Nodes, gltfNode)
-				doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, uint32(len(doc.Nodes)-1))
+			instData, err := instext.FromMat4(convertMatrices(transforms))
+			if err != nil {
+				return err
 			}
+			nodeIndex := uint32(len(doc.Nodes))
+			gltfNode := &gltf.Node{Mesh: &meshIndex}
+
+			if node.Mat != nil {
+				position, rotation, scale := mat4d.Decompose(node.Mat)
+				gltfNode.Translation = [3]float32{float32(position[0]), float32(position[1]), float32(position[2])}
+				gltfNode.Rotation = [4]float32{float32(rotation[0]), float32(rotation[1]), float32(rotation[2]), float32(rotation[3])}
+				gltfNode.Scale = [3]float32{float32(scale[0]), float32(scale[1]), float32(scale[2])}
+			}
+
+			if err := instext.WriteInstancing(doc, instData, instext.DefaultConfig()); err != nil {
+				return err
+			}
+			if len(joints) > 0 {
+				if gltfNode.Extensions == nil {
+					gltfNode.Extensions = make(gltf.Extensions)
+				}
+				jext := make([]map[string]interface{}, len(joints))
+				for i, jd := range joints {
+					jext[i] = map[string]interface{}{
+						"jointId": jd.JointId,
+						"value":   jd.Value,
+						"dynamic": jd.Dynamic,
+					}
+				}
+				gltfNode.Extensions["FLYWAVE_joint_metadata"] = jext
+			}
+
+			doc.Nodes = append(doc.Nodes, gltfNode)
+			doc.Scenes[0].Nodes = append(doc.Scenes[0].Nodes, nodeIndex)
+			doc.AddExtensionUsed(instext.ExtensionName)
 		}
 	}
 
 	return fillMaterials(doc, mesh.Materials)
+}
+
+func convertMatrices(src []*mat4d.T) []mat4.T {
+	dst := make([]mat4.T, len(src))
+	for i, m := range src {
+		for r := 0; r < 4; r++ {
+			for c := 0; c < 4; c++ {
+				dst[i][r][c] = float32(m[r][c])
+			}
+		}
+	}
+	return dst
 }
 
 // buildTexture 构建纹理
