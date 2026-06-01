@@ -100,6 +100,18 @@ func calcPadding(offset, unit int) int {
 
 // GetGltfBinary 将GLTF文档编码为二进制格式
 func GetGltfBinary(doc *gltf.Document, paddingUnit int) ([]byte, error) {
+	// GLTF spec: buffer.byteLength must be a multiple of 4.
+	// Pad buffer data and ByteLength before encoding so the JSON matches
+	// the actual BIN chunk size that the encoder will produce.
+	if len(doc.Buffers) > 0 {
+		buf := doc.Buffers[0]
+		pad := int((4 - buf.ByteLength%4) % 4)
+		if pad > 0 {
+			buf.Data = append(buf.Data, make([]byte, pad)...)
+			buf.ByteLength += uint32(pad)
+		}
+	}
+
 	writer := newBufferWriter()
 
 	encoder := gltf.NewEncoder(writer.writer)
